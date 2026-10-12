@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CARDX — Cyberpunk CC Toolkit & Validator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-container">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">
+          <h1>CARD<span class="highlight">X</span></h1>
+          <span class="version-tag">v5.0.7 Core</span>
+        </div>
+      </div>
+
+      <!-- Real-time Stats Header Bar -->
+      <div class="stats-bar">
+        <div class="stat-card">
+          <span class="stat-label">TOTAL CHECKS</span>
+          <span class="stat-value" id="stat-total">1,420</span>
+        </div>
+        <div class="stat-card success">
+          <span class="stat-label">APPROVED</span>
+          <span class="stat-value" id="stat-approved">1,180</span>
+        </div>
+        <div class="stat-card danger">
+          <span class="stat-label">DECLINED</span>
+          <span class="stat-value" id="stat-declined">240</span>
+        </div>
+        <div class="stat-card info">
+          <span class="stat-label">ACTIVE BINS</span>
+          <span class="stat-value" id="stat-bins">284,910</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Bar -->
+    <nav class="nav-tabs" id="nav-tabs">
+      <button class="tab-btn active" data-tab="tab-generator">🎴 Generator</button>
+      <button class="tab-btn" data-tab="tab-checker">✅ Validator</button>
+      <button class="tab-btn" data-tab="tab-bin">🏷️ BIN Lookup</button>
+      <button class="tab-btn" data-tab="tab-bulk">📂 Bulk Checker</button>
+      <button class="tab-btn" data-tab="tab-bindb">🗄️ BIN Database</button>
+      <button class="tab-btn" data-tab="tab-extrap">🔮 Extrapolator</button>
+      <button class="tab-btn" data-tab="tab-templates">🧩 Templates</button>
+      <button class="tab-btn" data-tab="tab-export">📤 Export</button>
+      <button class="tab-btn" data-tab="tab-settings">⚙️ Settings</button>
+      <button class="tab-btn" data-tab="tab-telegram">🤖 Telegram Bot</button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+
+      <!-- 1. Card Generator Tab -->
+      <section class="tab-content active" id="tab-generator">
+        <div class="grid-2">
+          <!-- Controls Panel -->
+          <div class="panel">
+            <h2 class="panel-title"><span class="icon">🎴</span> Card Generation Parameters</h2>
+            <form id="gen-form" onsubmit="return false;">
+              <div class="form-group">
+                <label>Card Brand Scheme</label>
+                <select id="gen-brand" class="form-control">
+                  <option value="Visa">Visa (4xxx...)</option>
+                  <option value="Mastercard">Mastercard (51-55, 2221...)</option>
+                  <option value="Amex">American Express (34, 37...)</option>
+                  <option value="Discover">Discover (6011, 65...)</option>
+                  <option value="Diners">Diners Club (36...)</option>
+                  <option value="JCB">JCB (3528...)</option>
+                  <option value="UnionPay">UnionPay (62...)</option>
+                  <option value="Maestro">Maestro (5018...)</option>
+                </select>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group col">
+                  <label>Quantity</label>
+                  <input type="number" id="gen-count" class="form-control" value="10" min="1" max="100">
+                </div>
+                <div class="form-group col">
+                  <label>BIN / Prefix Filter</label>
+                  <input type="text" id="gen-bin" class="form-control" placeholder="e.g. 400016">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Custom Pattern (Optional)</label>
+                <input type="text" id="gen-pattern" class="form-control" placeholder="414720xxxxxxxxxx|12/28|xxx">
+                <span class="help-text">Use <code>x</code> or <code>#</code> for random digits. Pipe format supported.</span>
+              </div>
+
+              <button class="btn btn-primary btn-block" id="btn-generate">⚡ Generate Test Cards</button>
+            </form>
+          </div>
+
+          <!-- Preview & Output Panel -->
+          <div class="panel">
+            <div class="panel-header-actions">
+              <h2 class="panel-title"><span class="icon">✨</span> Generated Cards Output</h2>
+              <button class="btn btn-sm btn-secondary" id="btn-copy-gen">📋 Copy All</button>
+            </div>
+            <div class="card-list-container" id="gen-results">
+              <div class="empty-state">No cards generated yet. Click "Generate Test Cards" to begin.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Validator Tab -->
+      <section class="tab-content" id="tab-checker">
+        <div class="grid-2">
+          <div class="panel">
+            <h2 class="panel-title"><span class="icon">✅</span> Single Card Validator</h2>
+            <div class="form-group">
+              <label>Card PAN or Pipe Format (PAN|MM/YY|CVV)</label>
+              <input type="text" id="check-input" class="form-control mono" placeholder="4000123456789010|12/28|123">
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-check">🔍 Validate Card Now</button>
+          </div>
+
+          <div class="panel" id="check-verdict-panel">
+            <h2 class="panel-title"><span class="icon">📊</span> Verification Breakdown</h2>
+            <div id="check-results">
+              <div class="empty-state">Enter a card number to inspect Luhn checksum, brand, length, and issuer details.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. BIN Lookup Tab -->
+      <section class="tab-content" id="tab-bin">
+        <div class="panel">
+          <h2 class="panel-title"><span class="icon">🏷️</span> Issuer Identification Number (BIN/IIN) Lookup</h2>
+          <div class="form-row search-row">
+            <input type="text" id="bin-input" class="form-control mono" placeholder="Enter 6-digit BIN (e.g. 400016, 515676)">
+            <button class="btn btn-primary" id="btn-bin-lookup">🔎 Lookup BIN</button>
+          </div>
+
+          <div id="bin-results" class="bin-card-wrapper" style="margin-top: 1.5rem;">
+            <div class="empty-state">Type a 6-digit BIN prefix to view card scheme, country, level and issuing bank.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Bulk Checker Tab -->
+      <section class="tab-content" id="tab-bulk">
+        <div class="panel">
+          <h2 class="panel-title"><span class="icon">📂</span> Multi-Threaded Bulk Card Validator</h2>
+          <div class="form-group">
+            <label>Paste Card List (One per line: PAN or PAN|MM/YY|CVV)</label>
+            <textarea id="bulk-input" class="form-control mono" rows="6" placeholder="4000123456789010|12/28|123
+5156761234567890|05/29|456
+3400051234567890|10/27|1234"></textarea>
+          </div>
+          <div class="form-row align-center">
+            <button class="btn btn-primary" id="btn-bulk-check">🚀 Run Bulk Validation</button>
+            <div class="status-summary" id="bulk-stats-summary" style="display:none;">
+              Total: <span id="bulk-total-count" class="badge">0</span> |
+              Pass: <span id="bulk-pass-count" class="badge badge-success">0</span> |
+              Fail: <span id="bulk-fail-count" class="badge badge-danger">0</span>
+            </div>
+          </div>
+
+          <div id="bulk-table-container" style="margin-top: 1.5rem;">
+            <div class="empty-state">Paste a list of cards above and click "Run Bulk Validation".</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. BIN Database Tab -->
+      <section class="tab-content" id="tab-bindb">
+        <div class="panel">
+          <div class="panel-header-actions">
+            <h2 class="panel-title"><span class="icon">🗄️</span> Offline BIN Range Explorer</h2>
+            <input type="text" id="bindb-search" class="form-control inline-search" placeholder="Filter BIN, Brand, Bank, Country...">
+          </div>
+          <div class="table-responsive" id="bindb-table-container" style="margin-top: 1rem;">
+            <div class="empty-state">Loading BIN database table...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. Extrapolator Tab -->
+      <section class="tab-content" id="tab-extrap">
+        <div class="grid-2">
+          <div class="panel">
+            <h2 class="panel-title"><span class="icon">🔮</span> Card Extrapolator Engine</h2>
+            <div class="form-group">
+              <label>Base Seed Card (PAN or Pipe Format)</label>
+              <input type="text" id="extrap-seed" class="form-control mono" placeholder="4000123456789010|12/28|123">
+            </div>
+            <div class="form-group">
+              <label>Extrapolation Yield Count</label>
+              <input type="number" id="extrap-count" class="form-control" value="10" min="1" max="50">
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-extrap">🔮 Extrapolate Cards</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header-actions">
+              <h2 class="panel-title"><span class="icon">✨</span> Extrapolated Output</h2>
+              <button class="btn btn-sm btn-secondary" id="btn-copy-extrap">📋 Copy Yield</button>
+            </div>
+            <div class="card-list-container" id="extrap-results">
+              <div class="empty-state">Enter a seed card to generate Luhn-compliant extrapolated variants.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. Templates Tab -->
+      <section class="tab-content" id="tab-templates">
+        <div class="panel">
+          <h2 class="panel-title"><span class="icon">🧩</span> Preset Generation Patterns</h2>
+          <div id="templates-grid" class="templates-grid">
+            <div class="empty-state">Loading generation templates...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. Export Tab -->
+      <section class="tab-content" id="tab-export">
+        <div class="panel" style="max-width: 600px; margin: 0 auto;">
+          <h2 class="panel-title"><span class="icon">📤</span> Result Export Center</h2>
+          <div class="form-group">
+            <label>Export Format</label>
+            <select id="export-format" class="form-control">
+              <option value="csv">CSV File (.csv)</option>
+              <option value="json">JSON File (.json)</option>
+              <option value="txt">Pipe Delimited TXT (.txt)</option>
+            </select>
+          </div>
+          <div class="form-group checkbox-group">
+            <label><input type="checkbox" id="export-mask" checked> Mask PAN numbers in exported file</label>
+          </div>
+          <button class="btn btn-primary btn-block" id="btn-export-download">📥 Download Results File</button>
+        </div>
+      </section>
+
+      <!-- 9. Settings Tab -->
+      <section class="tab-content" id="tab-settings">
+        <div class="panel" style="max-width: 650px; margin: 0 auto;">
+          <h2 class="panel-title"><span class="icon">⚙️</span> Toolkit Preferences & Defaults</h2>
+          <form id="settings-form" onsubmit="return false;">
+            <div class="form-group">
+              <label>Default Generator Scheme</label>
+              <select id="setting-default-brand" class="form-control">
+                <option value="Visa">Visa</option>
+                <option value="Mastercard">Mastercard</option>
+                <option value="Amex">American Express</option>
+                <option value="Discover">Discover</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Bulk Processing Thread Emulation</label>
+              <select id="setting-threads" class="form-control">
+                <option value="4">4 Workers</option>
+                <option value="8" selected>8 Workers (Optimal)</option>
+                <option value="16">16 Workers</option>
+              </select>
+            </div>
+            <div class="form-group checkbox-group">
+              <label><input type="checkbox" id="setting-mask-output" checked> Automatically mask PANs in validation displays</label>
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-save-settings">💾 Save Configuration</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- 10. Telegram Bot Tab -->
+      <section class="tab-content" id="tab-telegram">
+        <div class="grid-2">
+          <div class="panel">
+            <h2 class="panel-title"><span class="icon">🤖</span> Telegram Bot Integration</h2>
+            <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.9rem;">
+              CARDX features a Vercel serverless webhook integration for Telegram bots. Connect your bot token to route commands directly to CARDX core functions.
+            </p>
+            <div class="form-group">
+              <label>Webhook Vercel Endpoint</label>
+              <input type="text" class="form-control mono" value="https://your-domain.vercel.app/api/webhook" readonly>
+            </div>
+            <div class="bot-commands-list">
+              <h4>Supported Commands</h4>
+              <ul>
+                <li><code>/start</code>, <code>/help</code> — Command overview</li>
+                <li><code>/chk [card|pipe]</code> — Fast card validator</li>
+                <li><code>/gen [brand] [count]</code> — Test card generator</li>
+                <li><code>/bin [6-digit bin]</code> — Instant BIN lookup</li>
+                <li><code>/extrap [card]</code> — Algorithmic card extrapolator</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2 class="panel-title"><span class="icon">⚡</span> Interactive Webhook Tester</h2>
+            <div class="form-group">
+              <label>Simulate Bot Command</label>
+              <input type="text" id="tg-cmd-input" class="form-control mono" value="/chk 4000123456789010|12/28|123">
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-test-tg">🚀 Send Test Webhook Message</button>
+
+            <div class="tg-output-box" id="tg-response-box">
+              <span style="color: var(--text-dim);">Webhook response payload will appear here...</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <span>CARDX v5.0.7 &copy; Cyberpunk CC Toolkit & Core Engine</span>
+      <span class="status-indicator"><span class="dot"></span> Serverless Engine Online</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
