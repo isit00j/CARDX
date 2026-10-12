@@ -51,7 +51,7 @@ def action_about():
     setup_table.add_row('pip', 'Latest version recommended')
     setup_table.add_row('Libraries', 'rich, cryptography, requests, pyyaml, tabulate')
     setup_table.add_row('Install', 'pip install -r requirements.txt')
-    setup_table.add_row('Run', 'python main.py')
+    setup_table.add_row('Run', 'python cli.py')
     setup_table.add_row('Input', 'cards.txt for bulk validation')
     setup_table.add_row('Use case', 'Payment gateway QA & integration testing')
 

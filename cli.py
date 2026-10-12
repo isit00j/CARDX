@@ -42,7 +42,7 @@ _ensure_console()
 
 def _utf8_stdio():
     """Reconfigure std streams as UTF-8 with replacement fallback.
-    run.bat sets codepage 65001 before launch, but a bare ``python main.py``
+    run.bat sets codepage 65001 before launch, but a bare ``python cli.py``
     on a cp1252/cp866 machine (or with output piped to a file) would
     otherwise crash rich on the first emoji with UnicodeEncodeError.
     ``errors="replace"`` degrades glyphs instead of crashing."""

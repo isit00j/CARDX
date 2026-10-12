@@ -33,16 +33,16 @@ if [ ! -f "$_CACHE/python.exe" ]; then
 fi
 
 if [ -f "$_CACHE/python.exe" ]; then
-    exec "$_CACHE/python.exe" main.py "$@"
+    exec "$_CACHE/python.exe" cli.py "$@"
 fi
 if command -v python3 >/dev/null 2>&1; then
-    exec python3 main.py "$@"
+    exec python3 cli.py "$@"
 fi
 if command -v python >/dev/null 2>&1; then
-    exec python main.py "$@"
+    exec python cli.py "$@"
 fi
 if command -v py >/dev/null 2>&1; then
-    exec py -3 main.py "$@"
+    exec py -3 cli.py "$@"
 fi
 echo "No Python interpreter found (tried bundled runtime, python3, python, py)." >&2
 exit 1

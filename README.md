@@ -140,7 +140,7 @@ chmod +x run.sh
 
 ```bash
 pip install -r requirements.txt
-python main.py
+python cli.py
 ```
 
 ### Dependency Table
@@ -241,7 +241,7 @@ Select option [#]: 1
 
 ```
 CC-Checker/
-├── main.py                 # Entry point and menu system
+├── cli.py                  # Entry point and menu system
 ├── config.py               # Configuration loader (JSON + defaults)
 ├── bot_actions.py          # Generation, validation and export handlers
 ├── requirements.txt        # Python dependencies
