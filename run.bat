@@ -1,7 +1,7 @@
 @echo off
 rem chcp quirk (Server 2022 / Win11 cmd builds): `chcp 65001 >nul` with a
 rem redirected stdout CONSUMES the whole redirected stdin of the batch —
-rem a later `python main.py < in.txt` then sees instant EOF. Feeding chcp
+rem a later `python cli.py < in.txt` then sees instant EOF. Feeding chcp
 rem its own stdin from nul keeps the script's stdin intact (no-op for
 rem interactive console launches).
 chcp 65001 >nul <nul
@@ -81,10 +81,10 @@ if errorlevel 1 (
     pause
     goto :end
 )
-python main.py %*
+python cli.py %*
 goto :end
 
 :launch_bundled
-"%_PY%" main.py %*
+"%_PY%" cli.py %*
 
 :end
