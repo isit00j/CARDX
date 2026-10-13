@@ -542,20 +542,16 @@ function initExport() {
     btnDownload.addEventListener('click', async () => {
       const format = document.getElementById('export-format').value;
 
-      // Use actual active session records if available, otherwise sample records
-      const exportRecords = (appState.lastRecords && appState.lastRecords.length > 0)
-        ? appState.lastRecords
-        : [
-            { pan: '4000161234567890', brand: 'Visa', expiry: '12/28', cvv: '123', status: 'PASS' },
-            { pan: '5156761234567890', brand: 'Mastercard', expiry: '05/29', cvv: '456', status: 'PASS' },
-            { pan: '3400051234567890', brand: 'Amex', expiry: '10/27', cvv: '1234', status: 'PASS' }
-          ];
+      if (!appState.lastRecords || appState.lastRecords.length === 0) {
+        alert('No active session records found to export. Please generate or validate cards first.');
+        return;
+      }
 
       try {
         const res = await fetch('/api/export', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ records: exportRecords, format })
+          body: JSON.stringify({ records: appState.lastRecords, format })
         });
         const data = await res.json();
 

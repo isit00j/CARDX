@@ -157,6 +157,62 @@ class TestAPIHandlers(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual(body["method"], "sendMessage")
 
+    def test_webhook_secret_token_validation(self):
+        import os
+        os.environ["TELEGRAM_SECRET_TOKEN"] = "my_secret_token"
+        try:
+            # Test missing secret token header -> 401
+            payload = {"update_id": 1, "message": {"text": "/help", "chat": {"id": 12345}}}
+            req = DummyRequest(json.dumps(payload).encode('utf-8'))
+            h = webhook_handler.__new__(webhook_handler)
+            h.rfile = req.rfile
+            h.wfile = req.wfile
+            h.headers = req.headers
+            h.send_response = req.send_response
+            h.send_header = req.send_header
+            h.end_headers = req.end_headers
+            h.do_POST()
+            self.assertEqual(req.response_code, 401)
+
+            # Test valid secret token header -> 200
+            req2 = DummyRequest(json.dumps(payload).encode('utf-8'))
+            req2.headers['X-Telegram-Bot-Api-Secret-Token'] = "my_secret_token"
+            h2 = webhook_handler.__new__(webhook_handler)
+            h2.rfile = req2.rfile
+            h2.wfile = req2.wfile
+            h2.headers = req2.headers
+            h2.send_response = req2.send_response
+            h2.send_header = req2.send_header
+            h2.end_headers = req2.end_headers
+            h2.do_POST()
+            self.assertEqual(req2.response_code, 200)
+        finally:
+            os.environ.pop("TELEGRAM_SECRET_TOKEN", None)
+
+    def test_webhook_owner_id_restriction(self):
+        import os
+        os.environ["TELEGRAM_OWNER_ID"] = "999888"
+        try:
+            # Test missing or wrong sender ID -> unauthorized message
+            payload_wrong = {
+                "update_id": 1,
+                "message": {"from": {"id": 111222}, "text": "/gen", "chat": {"id": 12345}}
+            }
+            code, body = call_api_handler(webhook_handler, payload_wrong)
+            self.assertEqual(code, 200)
+            self.assertIn("Unauthorized access", body["text"])
+
+            # Test valid owner ID -> authorized message
+            payload_owner = {
+                "update_id": 1,
+                "message": {"from": {"id": 999888}, "text": "/help", "chat": {"id": 12345}}
+            }
+            code2, body2 = call_api_handler(webhook_handler, payload_owner)
+            self.assertEqual(code2, 200)
+            self.assertIn("CARDX Cyberpunk Toolkit Bot", body2["text"])
+        finally:
+            os.environ.pop("TELEGRAM_OWNER_ID", None)
+
 
 if __name__ == '__main__':
     unittest.main()
