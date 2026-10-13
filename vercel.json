@@ -1,4 +1,8 @@
 {
   "version": 2,
-  "cleanUrls": true
+  "cleanUrls": true,
+  "functions": {
+    "api/luhn.py": { "runtime": "python3.12" },
+    "api/safe-bin.py": { "runtime": "python3.12" }
+  }
 }
