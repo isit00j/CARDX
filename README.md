@@ -167,7 +167,7 @@ For Telegram bot integration, set the following environment variables:
 
 | Environment Variable | Required | Description |
 |----------------------|----------|-------------|
-| `TELEGRAM_SECRET_TOKEN` | Recommended in prod | Set to verify the `X-Telegram-Bot-Api-Secret-Token` header sent by Telegram webhooks. |
+| `TELEGRAM_SECRET_TOKEN` | **Mandatory in production** | Required secret token to verify incoming webhook requests against the `X-Telegram-Bot-Api-Secret-Token` header. |
 | `TELEGRAM_OWNER_ID` | Optional | Set your numeric Telegram user ID to restrict bot commands exclusively to the owner. **Leave unset** if the bot is intended for shared/multi-user or group use by friends. |
 
 ### Webhook Setup Instructions

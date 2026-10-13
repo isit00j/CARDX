@@ -95,10 +95,18 @@ function initGenerator() {
           addSessionRecords(data.cards);
           renderGeneratedCards(data.cards, resultsContainer);
         } else {
-          resultsContainer.innerHTML = '<div class="empty-state">Failed to generate cards. Check your inputs.</div>';
+          resultsContainer.replaceChildren();
+          const emptyState = document.createElement('div');
+          emptyState.className = 'empty-state';
+          emptyState.textContent = 'Failed to generate cards. Check your inputs.';
+          resultsContainer.appendChild(emptyState);
         }
       } catch (err) {
-        resultsContainer.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
+        resultsContainer.replaceChildren();
+        const errDiv = document.createElement('div');
+        errDiv.className = 'empty-state';
+        errDiv.textContent = `Error: ${err.message}`;
+        resultsContainer.appendChild(errDiv);
       } finally {
         btnGenerate.disabled = false;
         btnGenerate.innerHTML = '⚡ Generate Test Cards';
