@@ -769,6 +769,7 @@ function initSettings() {
 function initTelegram() {
   const btnTest = document.getElementById('btn-test-tg');
   const inputCmd = document.getElementById('tg-cmd-input');
+  const inputSecret = document.getElementById('tg-secret-input');
   const boxOutput = document.getElementById('tg-response-box');
 
   if (btnTest) {
@@ -789,9 +790,14 @@ function initTelegram() {
           }
         };
 
+        const headers = { 'Content-Type': 'application/json' };
+        if (inputSecret && inputSecret.value.trim()) {
+          headers['X-Telegram-Bot-Api-Secret-Token'] = inputSecret.value.trim();
+        }
+
         const res = await fetch('/api/webhook', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(payload)
         });
         const data = await res.json();

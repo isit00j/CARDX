@@ -305,6 +305,10 @@
               <label>Simulate Bot Command</label>
               <input type="text" id="tg-cmd-input" class="form-control mono" value="/chk 4000123456789010|12/28|123">
             </div>
+            <div class="form-group">
+              <label>Webhook Secret Token (Optional Header)</label>
+              <input type="password" id="tg-secret-input" class="form-control mono" placeholder="X-Telegram-Bot-Api-Secret-Token">
+            </div>
             <button class="btn btn-primary btn-block" id="btn-test-tg">🚀 Send Test Webhook Message</button>
 
             <div class="tg-output-box" id="tg-response-box">

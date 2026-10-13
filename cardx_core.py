@@ -414,24 +414,24 @@ def extrapolate_cards(seed_input: str, count=10):
     if not pan or len(pan) < 12:
         return {"error": "Seed PAN must be at least 12 digits"}
 
+    target_length = len(pan)
     bin_6 = pan[:6]
-    last_4 = pan[-4:] if len(pan) >= 10 else pan[-2:]
-    middle_len = len(pan) - len(bin_6) - 1  # exclude check digit
+    needed_mid = target_length - 1 - len(bin_6)
 
     extrapolated = []
-    seen = set()
+    seen = {pan}
 
-    # 1. Same BIN & pattern variation
-    for _ in range(count * 3):
+    # Same BIN & pattern variation
+    for _ in range(count * 10):
         if len(extrapolated) >= count:
             break
-        # Vary middle digits while maintaining prefix
-        mid_digits = "".join(str(random.randint(0, 9)) for _ in range(middle_len - len(bin_6)))
+
+        mid_digits = "".join(str(random.randint(0, 9)) for _ in range(needed_mid))
         body = bin_6 + mid_digits
         check = luhn_check_digit(body)
         candidate = body + str(check)
 
-        if candidate not in seen:
+        if candidate not in seen and len(candidate) == target_length and luhn_valid(candidate):
             seen.add(candidate)
             expiry = seed_res["expiry"] if seed_res["expiry"] != "N/A" else generate_expiry()
             cvv = seed_res["cvv"] if seed_res["cvv"] != "N/A" else generate_cvv(brand)

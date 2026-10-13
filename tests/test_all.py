@@ -82,6 +82,27 @@ class TestCardXCore(unittest.TestCase):
         self.assertFalse(res["overall_valid"])
         self.assertIn("error", res)
 
+    def test_extrapolate_cards_validity_and_length(self):
+        # Visa seed PAN (16 digits)
+        visa_seed = "4000123456789010"
+        res = cardx_core.extrapolate_cards(visa_seed, count=5)
+        self.assertEqual(res["count"], 5)
+        self.assertEqual(res["brand"], "Visa")
+        for item in res["extrapolated"]:
+            self.assertEqual(len(item["pan"]), 16)
+            self.assertTrue(cardx_core.luhn_valid(item["pan"]))
+            self.assertEqual(item["brand"], "Visa")
+
+        # Amex seed PAN (15 digits)
+        amex_seed = cardx_core.generate_single_card("Amex")["pan"]
+        res_amex = cardx_core.extrapolate_cards(amex_seed, count=5)
+        self.assertEqual(res_amex["count"], 5)
+        self.assertEqual(res_amex["brand"], "Amex")
+        for item in res_amex["extrapolated"]:
+            self.assertEqual(len(item["pan"]), 15)
+            self.assertTrue(cardx_core.luhn_valid(item["pan"]))
+            self.assertEqual(item["brand"], "Amex")
+
     def test_extrapolate_invalid_seed(self):
         res = cardx_core.extrapolate_cards("123")
         self.assertIn("error", res)

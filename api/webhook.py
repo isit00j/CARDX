@@ -16,11 +16,13 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            # Check Telegram Secret Token header if TELEGRAM_SECRET_TOKEN is set in environment
+            # Enforce Telegram Secret Token validation when TELEGRAM_SECRET_TOKEN is set or in production
             secret_token = os.environ.get("TELEGRAM_SECRET_TOKEN")
-            if secret_token:
-                req_secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token")
-                if req_secret != secret_token:
+            is_prod = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+            req_secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token")
+
+            if secret_token or is_prod:
+                if not secret_token or req_secret != secret_token:
                     self.send_response(401)
                     self.send_header('Content-Type', 'application/json')
                     self._send_cors_headers()
