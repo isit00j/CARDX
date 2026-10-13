@@ -46,8 +46,12 @@ class handler(BaseHTTPRequestHandler):
 
             # Check owner ID if TELEGRAM_OWNER_ID is set in environment
             owner_id = os.environ.get("TELEGRAM_OWNER_ID")
-            if owner_id and sender_id and str(sender_id) != str(owner_id):
-                response_text = "🔒 Unauthorized access. Bot usage is restricted to the owner."
+            if owner_id:
+                if not sender_id or str(sender_id) != str(owner_id):
+                    response_text = "🔒 Unauthorized access. Bot usage is restricted to the owner."
+                else:
+                    text = message.get("text", "")
+                    response_text = handle_telegram_command(text)
             else:
                 text = message.get("text", "")
                 response_text = handle_telegram_command(text)

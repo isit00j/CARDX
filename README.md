@@ -155,6 +155,28 @@ python cli.py
 
 ---
 
+## Environment & Security Configuration
+
+For Vercel deployment and Telegram bot integration, set the following environment variables:
+
+| Environment Variable | Required | Description |
+|----------------------|----------|-------------|
+| `CARDX_ACCESS_TOKEN` | Optional | Set a secret passkey to enable server-enforced access control on API endpoints. |
+| `TELEGRAM_SECRET_TOKEN` | Optional | Set to verify the `X-Telegram-Bot-Api-Secret-Token` header sent by Telegram webhooks. |
+| `TELEGRAM_OWNER_ID` | Optional | Set your numeric Telegram user ID to restrict bot commands exclusively to the owner. |
+
+### Webhook Setup Instructions
+
+1. Deploy the project to Vercel (or your HTTP host).
+2. Register your bot webhook with Telegram using `curl`:
+```bash
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://<YOUR_VERCEL_DOMAIN>/api/webhook", "secret_token": "<YOUR_SECRET_TOKEN>"}'
+```
+
+---
+
 ## Configuration
 
 Full `config.json` example:

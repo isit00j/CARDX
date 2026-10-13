@@ -12,10 +12,34 @@ document.addEventListener('DOMContentLoaded', () => {
   initTelegram();
 });
 
-// Global State for active session records
+// Global State for active session records, stats, and settings
 const appState = {
-  lastRecords: []
+  lastRecords: [],
+  stats: {
+    total: 0,
+    approved: 0,
+    declined: 0
+  },
+  settings: {
+    defaultBrand: 'Visa',
+    threads: 8,
+    mask: true
+  }
 };
+
+function updateStatsCounters(totalDelta = 0, approvedDelta = 0, declinedDelta = 0) {
+  appState.stats.total += totalDelta;
+  appState.stats.approved += approvedDelta;
+  appState.stats.declined += declinedDelta;
+
+  const totalEl = document.getElementById('stat-total');
+  const approvedEl = document.getElementById('stat-approved');
+  const declinedEl = document.getElementById('stat-declined');
+
+  if (totalEl) totalEl.textContent = appState.stats.total.toLocaleString();
+  if (approvedEl) approvedEl.textContent = appState.stats.approved.toLocaleString();
+  if (declinedEl) declinedEl.textContent = appState.stats.declined.toLocaleString();
+}
 
 // Tab Navigation
 function initTabs() {
@@ -94,15 +118,47 @@ function initGenerator() {
 }
 
 function renderGeneratedCards(cards, container) {
-  container.innerHTML = cards.map(c => `
-    <div class="card-item">
-      <div class="card-main">
-        <span class="card-pipe">${c.pipe_format}</span>
-        <span class="card-meta">${c.brand} • ${c.formatted}</span>
-      </div>
-      <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${c.pipe_format}')">📋 Copy</button>
-    </div>
-  `).join('');
+  container.replaceChildren();
+
+  if (!cards || cards.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'empty-state';
+    emptyState.textContent = 'No cards generated yet. Click "Generate Test Cards" to begin.';
+    container.appendChild(emptyState);
+    return;
+  }
+
+  cards.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'card-item';
+
+    const main = document.createElement('div');
+    main.className = 'card-main';
+
+    const pipe = document.createElement('span');
+    pipe.className = 'card-pipe';
+    pipe.textContent = c.pipe_format || '';
+
+    const meta = document.createElement('span');
+    meta.className = 'card-meta';
+    meta.textContent = `${c.brand || 'Unknown'} • ${c.formatted || ''}`;
+
+    main.appendChild(pipe);
+    main.appendChild(meta);
+
+    const btnCopy = document.createElement('button');
+    btnCopy.className = 'btn btn-sm btn-secondary';
+    btnCopy.textContent = '📋 Copy';
+    btnCopy.addEventListener('click', () => {
+      navigator.clipboard.writeText(c.pipe_format || '');
+      btnCopy.textContent = '✅ Copied!';
+      setTimeout(() => { btnCopy.textContent = '📋 Copy'; }, 2000);
+    });
+
+    item.appendChild(main);
+    item.appendChild(btnCopy);
+    container.appendChild(item);
+  });
 }
 
 // 2. Validator Handler
@@ -138,26 +194,55 @@ function initValidator() {
 }
 
 function renderValidationResult(data, container) {
+  container.replaceChildren();
+
   if (data.error) {
-    container.innerHTML = `<div class="empty-state" style="color:var(--danger-color)">${data.error}</div>`;
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'empty-state';
+    errorDiv.style.color = 'var(--danger-color)';
+    errorDiv.textContent = data.error;
+    container.appendChild(errorDiv);
     return;
   }
 
-  const badgeClass = data.overall_valid ? 'badge-success' : 'badge-danger';
-  container.innerHTML = `
-    <div style="margin-bottom: 1rem;">
-      <span class="badge ${badgeClass}" style="font-size: 1rem; padding: 0.4rem 0.8rem;">${data.status}</span>
-    </div>
-    <table class="data-table">
-      <tr><th>Card PAN</th><td>${data.formatted} (${data.masked})</td></tr>
-      <tr><th>Brand Scheme</th><td>${data.brand}</td></tr>
-      <tr><th>Luhn Mod-10 Check</th><td>${data.is_luhn_valid ? '✅ PASS' : '❌ FAIL'}</td></tr>
-      <tr><th>Length Check</th><td>${data.length} digits (${data.is_length_valid ? 'Valid' : 'Invalid, expected ' + data.expected_length})</td></tr>
-      <tr><th>Expiry Format</th><td>${data.expiry} (${data.is_expiry_valid ? 'Valid' : 'Invalid'})</td></tr>
-      <tr><th>CVV Format</th><td>${data.cvv} (${data.is_cvv_valid ? 'Valid' : 'Invalid'})</td></tr>
-      <tr><th>Issuer Bank</th><td>${data.bin_info.issuer} (${data.bin_info.flag} ${data.bin_info.country})</td></tr>
-    </table>
-  `;
+  updateStatsCounters(1, data.overall_valid ? 1 : 0, data.overall_valid ? 0 : 1);
+
+  const badgeWrapper = document.createElement('div');
+  badgeWrapper.style.marginBottom = '1rem';
+
+  const badge = document.createElement('span');
+  badge.className = `badge ${data.overall_valid ? 'badge-success' : 'badge-danger'}`;
+  badge.style.fontSize = '1rem';
+  badge.style.padding = '0.4rem 0.8rem';
+  badge.textContent = data.status || (data.overall_valid ? 'APPROVED / PASS' : 'DECLINED / FAIL');
+  badgeWrapper.appendChild(badge);
+
+  const table = document.createElement('table');
+  table.className = 'data-table';
+
+  const rows = [
+    ['Card PAN', `${data.formatted || ''} (${data.masked || ''})`],
+    ['Brand Scheme', data.brand || 'Unknown'],
+    ['Luhn Mod-10 Check', data.is_luhn_valid ? '✅ PASS' : '❌ FAIL'],
+    ['Length Check', `${data.length || 0} digits (${data.is_length_valid ? 'Valid' : 'Invalid, expected ' + (data.expected_length || '')})`],
+    ['Expiry Format', `${data.expiry || 'N/A'} (${data.is_expiry_valid ? 'Valid' : 'Invalid'})`],
+    ['CVV Format', `${data.cvv || 'N/A'} (${data.is_cvv_valid ? 'Valid' : 'Invalid'})`],
+    ['Issuer Bank', `${data.bin_info?.issuer || 'Unknown'} (${data.bin_info?.flag || ''} ${data.bin_info?.country || ''})`]
+  ];
+
+  rows.forEach(([label, value]) => {
+    const tr = document.createElement('tr');
+    const th = document.createElement('th');
+    th.textContent = label;
+    const td = document.createElement('td');
+    td.textContent = value;
+    tr.appendChild(th);
+    tr.appendChild(td);
+    table.appendChild(tr);
+  });
+
+  container.appendChild(badgeWrapper);
+  container.appendChild(table);
 }
 
 // 3. BIN Lookup Handler
@@ -404,32 +489,50 @@ function initExtrapolation() {
 // 7. Templates Handler
 async function initTemplates() {
   const container = document.getElementById('templates-grid');
+  if (!container) return;
 
   try {
     const res = await fetch('/api/templates');
     const data = await res.json();
 
-    if (data.templates && container) {
-      container.innerHTML = data.templates.map(t => `
-        <div class="template-card" onclick="useTemplate('${t.pattern}')">
-          <h3>${t.name}</h3>
-          <code>${t.pattern}</code>
-          <p>${t.description}</p>
-        </div>
-      `).join('');
+    if (data.templates && Array.isArray(data.templates)) {
+      container.replaceChildren();
+
+      data.templates.forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'template-card';
+
+        const title = document.createElement('h3');
+        title.textContent = t.name || '';
+
+        const code = document.createElement('code');
+        code.textContent = t.pattern || '';
+
+        const desc = document.createElement('p');
+        desc.textContent = t.description || '';
+
+        card.appendChild(title);
+        card.appendChild(code);
+        card.appendChild(desc);
+
+        card.addEventListener('click', () => {
+          const genTab = document.querySelector('[data-tab="tab-generator"]');
+          if (genTab) genTab.click();
+          const patternInput = document.getElementById('gen-pattern');
+          if (patternInput) patternInput.value = t.pattern || '';
+        });
+
+        container.appendChild(card);
+      });
     }
   } catch (err) {
-    if (container) container.innerHTML = `<div class="empty-state">Error loading templates: ${err.message}</div>`;
+    container.replaceChildren();
+    const errDiv = document.createElement('div');
+    errDiv.className = 'empty-state';
+    errDiv.textContent = `Error loading templates: ${err.message}`;
+    container.appendChild(errDiv);
   }
 }
-
-window.useTemplate = function(pattern) {
-  // Switch to generator tab & fill pattern
-  const genTab = document.querySelector('[data-tab="tab-generator"]');
-  if (genTab) genTab.click();
-  const patternInput = document.getElementById('gen-pattern');
-  if (patternInput) patternInput.value = pattern;
-};
 
 // 8. Export Handler
 function initExport() {
@@ -478,18 +581,37 @@ function initExport() {
 // 9. Settings Handler
 function initSettings() {
   const btnSave = document.getElementById('btn-save-settings');
+  const brandSelect = document.getElementById('setting-default-brand');
+  const threadsSelect = document.getElementById('setting-threads');
+  const maskCheckbox = document.getElementById('setting-mask-output');
+
+  // Load saved settings from localStorage
+  const savedSettings = localStorage.getItem('cardx_settings');
+  if (savedSettings) {
+    try {
+      const parsed = JSON.parse(savedSettings);
+      if (parsed.default_brand && brandSelect) brandSelect.value = parsed.default_brand;
+      if (parsed.threads && threadsSelect) threadsSelect.value = parsed.threads;
+      if (typeof parsed.mask === 'boolean' && maskCheckbox) maskCheckbox.checked = parsed.mask;
+    } catch (e) {
+      console.error('Failed to parse saved settings:', e);
+    }
+  }
 
   if (btnSave) {
     btnSave.addEventListener('click', async () => {
-      const default_brand = document.getElementById('setting-default-brand').value;
-      const threads = document.getElementById('setting-threads').value;
-      const mask = document.getElementById('setting-mask-output').checked;
+      const default_brand = brandSelect ? brandSelect.value : 'Visa';
+      const threads = threadsSelect ? threadsSelect.value : '8';
+      const mask = maskCheckbox ? maskCheckbox.checked : true;
+
+      const payload = { default_brand, threads, mask };
 
       try {
+        localStorage.setItem('cardx_settings', JSON.stringify(payload));
         await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ default_brand, threads, mask })
+          body: JSON.stringify(payload)
         });
         btnSave.innerText = '✅ Settings Saved!';
         setTimeout(() => { btnSave.innerText = '💾 Save Configuration'; }, 2000);
