@@ -61,6 +61,11 @@ class TestCardXCore(unittest.TestCase):
             self.assertEqual(c["brand"], "Mastercard")
             self.assertTrue(c["luhn_valid"])
 
+    def test_generate_cards_bounds(self):
+        # Check count clamping (max 100)
+        cards = cardx_core.generate_cards(brand="Visa", count=200)
+        self.assertEqual(len(cards), 100)
+
     def test_bin_lookup(self):
         info = cardx_core.lookup_bin("400016")
         self.assertEqual(info["bin"], "400016")
@@ -71,6 +76,15 @@ class TestCardXCore(unittest.TestCase):
         res = cardx_core.validate_card(card["pipe_format"])
         self.assertTrue(res["overall_valid"])
         self.assertEqual(res["brand"], "Amex")
+
+    def test_validate_card_empty(self):
+        res = cardx_core.validate_card("")
+        self.assertFalse(res["overall_valid"])
+        self.assertIn("error", res)
+
+    def test_extrapolate_invalid_seed(self):
+        res = cardx_core.extrapolate_cards("123")
+        self.assertIn("error", res)
 
     def test_bulk_check(self):
         cards = cardx_core.generate_cards("Visa", 3)

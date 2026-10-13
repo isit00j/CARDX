@@ -188,12 +188,16 @@ def generate_single_card(brand="Visa", prefix="", custom_length=None):
 
 def generate_cards(brand="Visa", count=10, bin_prefix="", custom_pattern=""):
     """Generate multiple cards according to criteria or pattern."""
-    count = max(1, min(int(count), 100))
+    try:
+        count = int(count)
+    except (ValueError, TypeError):
+        count = 10
+    count = max(1, min(count, 100))
     results = []
 
-    if custom_pattern:
+    if custom_pattern and str(custom_pattern).strip():
         for _ in range(count):
-            results.append(generate_from_pattern(custom_pattern))
+            results.append(generate_from_pattern(str(custom_pattern).strip()))
         return results
 
     # Determine brand from bin_prefix if prefix provided
@@ -261,6 +265,14 @@ def validate_card(card_input: str):
     Validate single card string (accepts PAN or PAN|MM/YY|CVV).
     Returns complete breakdown of validity metrics.
     """
+    if not card_input or not isinstance(card_input, str):
+        return {
+            "valid": False,
+            "error": "No card input provided",
+            "overall_valid": False,
+            "status": "DECLINED / FAIL"
+        }
+
     parts = [p.strip() for p in card_input.split("|")]
     raw_pan = only_digits(parts[0])
 
@@ -268,7 +280,12 @@ def validate_card(card_input: str):
     cvv_input = parts[2] if len(parts) > 2 else None
 
     if not raw_pan:
-        return {"valid": False, "error": "No digits found in input"}
+        return {
+            "valid": False,
+            "error": "No digits found in input",
+            "overall_valid": False,
+            "status": "DECLINED / FAIL"
+        }
 
     brand = detect_brand(raw_pan)
     is_luhn = luhn_valid(raw_pan)
@@ -384,11 +401,17 @@ def extrapolate_cards(seed_input: str, count=10):
     Extrapolate candidate cards from a base PAN or seed card line.
     Uses pattern variation on middle/last digits with Luhn verification.
     """
-    seed_res = validate_card(seed_input)
-    pan = seed_res["pan"]
-    brand = seed_res["brand"]
+    try:
+        count = int(count)
+    except (ValueError, TypeError):
+        count = 10
+    count = max(1, min(count, 50))
 
-    if len(pan) < 12:
+    seed_res = validate_card(seed_input)
+    pan = seed_res.get("pan", "")
+    brand = seed_res.get("brand", "Unknown")
+
+    if not pan or len(pan) < 12:
         return {"error": "Seed PAN must be at least 12 digits"}
 
     bin_6 = pan[:6]

@@ -12,6 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initTelegram();
 });
 
+// Global State for active session records
+const appState = {
+  lastRecords: []
+};
+
 // Tab Navigation
 function initTabs() {
   const tabs = document.querySelectorAll('.tab-btn');
@@ -21,10 +26,14 @@ function initTabs() {
     tab.addEventListener('click', () => {
       const target = tab.getAttribute('data-tab');
 
-      tabs.forEach(t => t.classList.remove('active'));
+      tabs.forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
       contents.forEach(c => c.classList.remove('active'));
 
       tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
       const contentEl = document.getElementById(target);
       if (contentEl) contentEl.classList.add('active');
     });
@@ -59,6 +68,7 @@ function initGenerator() {
 
         if (data.cards && data.cards.length > 0) {
           currentGenerated = data.cards;
+          appState.lastRecords = data.cards;
           renderGeneratedCards(data.cards, resultsContainer);
         } else {
           resultsContainer.innerHTML = '<div class="empty-state">Failed to generate cards. Check your inputs.</div>';
@@ -429,29 +439,35 @@ function initExport() {
     btnDownload.addEventListener('click', async () => {
       const format = document.getElementById('export-format').value;
 
-      // Create sample dataset for export demonstration or use cached cards
-      const sampleRecords = [
-        { pan: '4000161234567890', brand: 'Visa', expiry: '12/28', cvv: '123', status: 'PASS' },
-        { pan: '5156761234567890', brand: 'Mastercard', expiry: '05/29', cvv: '456', status: 'PASS' },
-        { pan: '3400051234567890', brand: 'Amex', expiry: '10/27', cvv: '1234', status: 'PASS' }
-      ];
+      // Use actual active session records if available, otherwise sample records
+      const exportRecords = (appState.lastRecords && appState.lastRecords.length > 0)
+        ? appState.lastRecords
+        : [
+            { pan: '4000161234567890', brand: 'Visa', expiry: '12/28', cvv: '123', status: 'PASS' },
+            { pan: '5156761234567890', brand: 'Mastercard', expiry: '05/29', cvv: '456', status: 'PASS' },
+            { pan: '3400051234567890', brand: 'Amex', expiry: '10/27', cvv: '1234', status: 'PASS' }
+          ];
 
       try {
         const res = await fetch('/api/export', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ records: sampleRecords, format })
+          body: JSON.stringify({ records: exportRecords, format })
         });
         const data = await res.json();
 
-        // Trigger file download
-        const blob = new Blob([data.content], { type: data.mime_type });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = data.filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
+        if (data.content) {
+          // Trigger file download
+          const blob = new Blob([data.content], { type: data.mime_type });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = data.filename;
+          a.click();
+          window.URL.revokeObjectURL(url);
+        } else {
+          alert('Export error: ' + (data.error || 'Failed to generate export file'));
+        }
       } catch (err) {
         alert('Export failed: ' + err.message);
       }
