@@ -92,7 +92,7 @@ function initGenerator() {
 
         if (data.cards && data.cards.length > 0) {
           currentGenerated = data.cards;
-          appState.lastRecords = data.cards;
+          addSessionRecords(data.cards);
           renderGeneratedCards(data.cards, resultsContainer);
         } else {
           resultsContainer.innerHTML = '<div class="empty-state">Failed to generate cards. Check your inputs.</div>';
@@ -161,6 +161,18 @@ function renderGeneratedCards(cards, container) {
   });
 }
 
+// Helper: Append record to appState.lastRecords
+function addSessionRecord(record) {
+  if (!record) return;
+  appState.lastRecords.push(record);
+}
+
+function addSessionRecords(records) {
+  if (Array.isArray(records)) {
+    records.forEach(r => addSessionRecord(r));
+  }
+}
+
 // 2. Validator Handler
 function initValidator() {
   const btnCheck = document.getElementById('btn-check');
@@ -182,9 +194,16 @@ function initValidator() {
           body: JSON.stringify({ card })
         });
         const data = await res.json();
+        if (!data.error && data.pan) {
+          addSessionRecord(data);
+        }
         renderValidationResult(data, resultsContainer);
       } catch (err) {
-        resultsContainer.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
+        resultsContainer.replaceChildren();
+        const errDiv = document.createElement('div');
+        errDiv.className = 'empty-state';
+        errDiv.textContent = `Error: ${err.message}`;
+        resultsContainer.appendChild(errDiv);
       } finally {
         btnCheck.disabled = false;
         btnCheck.innerText = '🔍 Validate Card Now';
@@ -267,24 +286,62 @@ function initBinLookup() {
         });
         const data = await res.json();
 
-        resultsContainer.innerHTML = `
-          <div class="bin-result-box">
-            <div class="bin-prop"><span class="prop-label">BIN / IIN</span><span class="prop-value">${data.bin}</span></div>
-            <div class="bin-prop"><span class="prop-label">Brand Scheme</span><span class="prop-value">${data.brand}</span></div>
-            <div class="bin-prop"><span class="prop-label">Card Type</span><span class="prop-value">${data.type}</span></div>
-            <div class="bin-prop"><span class="prop-label">Card Tier</span><span class="prop-value">${data.level}</span></div>
-            <div class="bin-prop"><span class="prop-label">Issuer Bank</span><span class="prop-value">${data.issuer}</span></div>
-            <div class="bin-prop"><span class="prop-label">Country</span><span class="prop-value">${data.flag} ${data.country}</span></div>
-          </div>
-        `;
+        renderBinLookupResult(data, resultsContainer);
       } catch (err) {
-        resultsContainer.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
+        resultsContainer.replaceChildren();
+        const errDiv = document.createElement('div');
+        errDiv.className = 'empty-state';
+        errDiv.textContent = `Error: ${err.message}`;
+        resultsContainer.appendChild(errDiv);
       } finally {
         btnLookup.disabled = false;
         btnLookup.innerText = '🔎 Lookup BIN';
       }
     });
   }
+}
+
+function renderBinLookupResult(data, container) {
+  container.replaceChildren();
+
+  if (data.error) {
+    const errDiv = document.createElement('div');
+    errDiv.className = 'empty-state';
+    errDiv.textContent = data.error;
+    container.appendChild(errDiv);
+    return;
+  }
+
+  const box = document.createElement('div');
+  box.className = 'bin-result-box';
+
+  const props = [
+    ['BIN / IIN', data.bin || 'N/A'],
+    ['Brand Scheme', data.brand || 'N/A'],
+    ['Card Type', data.type || 'N/A'],
+    ['Card Tier', data.level || 'N/A'],
+    ['Issuer Bank', data.issuer || 'N/A'],
+    ['Country', `${data.flag || ''} ${data.country || ''}`.trim()]
+  ];
+
+  props.forEach(([label, val]) => {
+    const propDiv = document.createElement('div');
+    propDiv.className = 'bin-prop';
+
+    const lblSpan = document.createElement('span');
+    lblSpan.className = 'prop-label';
+    lblSpan.textContent = label;
+
+    const valSpan = document.createElement('span');
+    valSpan.className = 'prop-value';
+    valSpan.textContent = val;
+
+    propDiv.appendChild(lblSpan);
+    propDiv.appendChild(valSpan);
+    box.appendChild(propDiv);
+  });
+
+  container.appendChild(box);
 }
 
 // 4. Bulk Checker Handler
@@ -311,13 +368,22 @@ function initBulkChecker() {
         const data = await res.json();
 
         statsSummary.style.display = 'inline-block';
-        document.getElementById('bulk-total-count').innerText = data.total;
-        document.getElementById('bulk-pass-count').innerText = data.passed;
-        document.getElementById('bulk-fail-count').innerText = data.failed;
+        document.getElementById('bulk-total-count').textContent = data.total || 0;
+        document.getElementById('bulk-pass-count').textContent = data.passed || 0;
+        document.getElementById('bulk-fail-count').textContent = data.failed || 0;
+
+        if (data.results && Array.isArray(data.results)) {
+          const bulkRecords = data.results.map(r => r.res).filter(Boolean);
+          addSessionRecords(bulkRecords);
+        }
 
         renderBulkTable(data.results, tableContainer);
       } catch (err) {
-        tableContainer.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
+        tableContainer.replaceChildren();
+        const errDiv = document.createElement('div');
+        errDiv.className = 'empty-state';
+        errDiv.textContent = `Error: ${err.message}`;
+        tableContainer.appendChild(errDiv);
       } finally {
         btnBulk.disabled = false;
         btnBulk.innerText = '🚀 Run Bulk Validation';
@@ -327,41 +393,65 @@ function initBulkChecker() {
 }
 
 function renderBulkTable(results, container) {
+  container.replaceChildren();
+
   if (!results || results.length === 0) {
-    container.innerHTML = '<div class="empty-state">No valid lines found.</div>';
+    const emptyState = document.createElement('div');
+    emptyState.className = 'empty-state';
+    emptyState.textContent = 'No valid lines found.';
+    container.appendChild(emptyState);
     return;
   }
 
-  const rows = results.map(r => {
-    const res = r.res;
-    const badgeClass = res.overall_valid ? 'badge-success' : 'badge-danger';
-    return `
-      <tr>
-        <td>#${r.id}</td>
-        <td>${res.masked}</td>
-        <td>${res.brand}</td>
-        <td><span class="badge ${badgeClass}">${res.status}</span></td>
-        <td>${res.bin_info.issuer} (${res.bin_info.country})</td>
-      </tr>
-    `;
-  }).join('');
+  const table = document.createElement('table');
+  table.className = 'data-table';
 
-  container.innerHTML = `
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Masked PAN</th>
-          <th>Brand</th>
-          <th>Verdict</th>
-          <th>Issuer</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  `;
+  const thead = document.createElement('thead');
+  const trHead = document.createElement('tr');
+  ['#', 'Masked PAN', 'Brand', 'Verdict', 'Issuer'].forEach(col => {
+    const th = document.createElement('th');
+    th.textContent = col;
+    trHead.appendChild(th);
+  });
+  thead.appendChild(trHead);
+
+  const tbody = document.createElement('tbody');
+  results.forEach(r => {
+    const res = r.res || {};
+    const tr = document.createElement('tr');
+
+    const tdId = document.createElement('td');
+    tdId.textContent = `#${r.id || ''}`;
+
+    const tdPan = document.createElement('td');
+    tdPan.textContent = res.masked || '';
+
+    const tdBrand = document.createElement('td');
+    tdBrand.textContent = res.brand || 'Unknown';
+
+    const tdVerdict = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className = `badge ${res.overall_valid ? 'badge-success' : 'badge-danger'}`;
+    badge.textContent = res.status || (res.overall_valid ? 'PASS' : 'FAIL');
+    tdVerdict.appendChild(badge);
+
+    const tdIssuer = document.createElement('td');
+    const issuer = res.bin_info?.issuer || 'Unknown';
+    const country = res.bin_info?.country || '';
+    tdIssuer.textContent = country ? `${issuer} (${country})` : issuer;
+
+    tr.appendChild(tdId);
+    tr.appendChild(tdPan);
+    tr.appendChild(tdBrand);
+    tr.appendChild(tdVerdict);
+    tr.appendChild(tdIssuer);
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  container.appendChild(table);
 }
 
 // 5. BIN Database Handler
@@ -379,7 +469,11 @@ async function initBinDatabase() {
       const data = await res.json();
       renderBinDbTable(data.results, container);
     } catch (err) {
-      container.innerHTML = `<div class="empty-state">Error loading BIN DB: ${err.message}</div>`;
+      container.replaceChildren();
+      const errDiv = document.createElement('div');
+      errDiv.className = 'empty-state';
+      errDiv.textContent = `Error loading BIN DB: ${err.message}`;
+      container.appendChild(errDiv);
     }
   }
 
@@ -397,39 +491,65 @@ async function initBinDatabase() {
 }
 
 function renderBinDbTable(list, container) {
+  container.replaceChildren();
+
   if (!list || list.length === 0) {
-    container.innerHTML = '<div class="empty-state">No BIN records match query.</div>';
+    const emptyState = document.createElement('div');
+    emptyState.className = 'empty-state';
+    emptyState.textContent = 'No BIN records match query.';
+    container.appendChild(emptyState);
     return;
   }
 
-  const rows = list.map(item => `
-    <tr>
-      <td><code>${item.bin}</code></td>
-      <td>${item.brand}</td>
-      <td>${item.type}</td>
-      <td>${item.level}</td>
-      <td>${item.issuer}</td>
-      <td>${item.flag} ${item.country}</td>
-    </tr>
-  `).join('');
+  const table = document.createElement('table');
+  table.className = 'data-table';
 
-  container.innerHTML = `
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>BIN</th>
-          <th>Brand</th>
-          <th>Type</th>
-          <th>Tier</th>
-          <th>Issuer</th>
-          <th>Country</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  `;
+  const thead = document.createElement('thead');
+  const trHead = document.createElement('tr');
+  ['BIN', 'Brand', 'Type', 'Tier', 'Issuer', 'Country'].forEach(col => {
+    const th = document.createElement('th');
+    th.textContent = col;
+    trHead.appendChild(th);
+  });
+  thead.appendChild(trHead);
+
+  const tbody = document.createElement('tbody');
+  list.forEach(item => {
+    const tr = document.createElement('tr');
+
+    const tdBin = document.createElement('td');
+    const code = document.createElement('code');
+    code.textContent = item.bin || '';
+    tdBin.appendChild(code);
+
+    const tdBrand = document.createElement('td');
+    tdBrand.textContent = item.brand || '';
+
+    const tdType = document.createElement('td');
+    tdType.textContent = item.type || '';
+
+    const tdLevel = document.createElement('td');
+    tdLevel.textContent = item.level || '';
+
+    const tdIssuer = document.createElement('td');
+    tdIssuer.textContent = item.issuer || '';
+
+    const tdCountry = document.createElement('td');
+    tdCountry.textContent = `${item.flag || ''} ${item.country || ''}`.trim();
+
+    tr.appendChild(tdBin);
+    tr.appendChild(tdBrand);
+    tr.appendChild(tdType);
+    tr.appendChild(tdLevel);
+    tr.appendChild(tdIssuer);
+    tr.appendChild(tdCountry);
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  container.appendChild(table);
 }
 
 // 6. Extrapolation Handler
@@ -460,14 +580,23 @@ function initExtrapolation() {
         });
         const data = await res.json();
 
-        if (data.extrapolated) {
+        if (data.extrapolated && Array.isArray(data.extrapolated)) {
           currentExtrapolations = data.extrapolated;
+          addSessionRecords(data.extrapolated);
           renderGeneratedCards(data.extrapolated, resultsContainer);
         } else {
-          resultsContainer.innerHTML = `<div class="empty-state">${data.error || 'Failed to extrapolate.'}</div>`;
+          resultsContainer.replaceChildren();
+          const errDiv = document.createElement('div');
+          errDiv.className = 'empty-state';
+          errDiv.textContent = data.error || 'Failed to extrapolate.';
+          resultsContainer.appendChild(errDiv);
         }
       } catch (err) {
-        resultsContainer.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
+        resultsContainer.replaceChildren();
+        const errDiv = document.createElement('div');
+        errDiv.className = 'empty-state';
+        errDiv.textContent = `Error: ${err.message}`;
+        resultsContainer.appendChild(errDiv);
       } finally {
         btnExtrap.disabled = false;
         btnExtrap.innerText = '🔮 Extrapolate Cards';
@@ -602,17 +731,28 @@ function initSettings() {
 
       const payload = { default_brand, threads, mask };
 
+      // Save in browser localStorage immediately
+      localStorage.setItem('cardx_settings', JSON.stringify(payload));
+
       try {
-        localStorage.setItem('cardx_settings', JSON.stringify(payload));
-        await fetch('/api/settings', {
+        const res = await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        btnSave.innerText = '✅ Settings Saved!';
-        setTimeout(() => { btnSave.innerText = '💾 Save Configuration'; }, 2000);
+
+        if (res.ok) {
+          btnSave.innerText = '✅ Settings Saved!';
+          setTimeout(() => { btnSave.innerText = '💾 Save Configuration'; }, 2000);
+        } else {
+          alert(`Server sync warning (HTTP ${res.status}). Settings saved in browser local storage.`);
+          btnSave.innerText = '⚠️ Saved Locally';
+          setTimeout(() => { btnSave.innerText = '💾 Save Configuration'; }, 2000);
+        }
       } catch (err) {
-        alert('Failed to save settings: ' + err.message);
+        btnSave.innerText = '⚠️ Saved Locally';
+        setTimeout(() => { btnSave.innerText = '💾 Save Configuration'; }, 2000);
+        console.warn('Server settings sync failed, saved locally:', err.message);
       }
     });
   }

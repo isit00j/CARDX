@@ -160,6 +160,8 @@ python cli.py
 ### Website Personal Access Control Notice
 For website personal-use protection, enable **Vercel Authentication** ("All Deployments" protection) in your Vercel project settings prior to public deployment.
 
+If Vercel Authentication is active on all deployments and you need the Telegram webhook to bypass password prompts automatically, configure **Vercel Deployment Protection Bypass for Automation** in project settings and include the bypass token when registering your webhook URL.
+
 ### Telegram Webhook Security Configuration
 For Telegram bot integration, set the following environment variables:
 
