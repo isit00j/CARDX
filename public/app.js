@@ -742,15 +742,14 @@ function initSettings() {
         });
 
         if (res.ok) {
-          btnSave.innerText = '✅ Settings Saved!';
+          btnSave.innerText = '✅ Settings Saved in Browser!';
           setTimeout(() => { btnSave.innerText = '💾 Save Configuration'; }, 2000);
         } else {
-          alert(`Server sync warning (HTTP ${res.status}). Settings saved in browser local storage.`);
-          btnSave.innerText = '⚠️ Saved Locally';
+          btnSave.innerText = '✅ Settings Saved in Browser!';
           setTimeout(() => { btnSave.innerText = '💾 Save Configuration'; }, 2000);
         }
       } catch (err) {
-        btnSave.innerText = '⚠️ Saved Locally';
+        btnSave.innerText = '✅ Settings Saved in Browser!';
         setTimeout(() => { btnSave.innerText = '💾 Save Configuration'; }, 2000);
         console.warn('Server settings sync failed, saved locally:', err.message);
       }

@@ -157,27 +157,35 @@ python cli.py
 
 ## Environment & Security Configuration
 
-### Website Personal Access Control Notice
+### Website Personal Access Control & Settings Persistence
 For website personal-use protection, enable **Vercel Authentication** ("All Deployments" protection) in your Vercel project settings prior to public deployment.
 
-If Vercel Authentication is active on all deployments and you need the Telegram webhook to bypass password prompts automatically, configure **Vercel Deployment Protection Bypass for Automation** in project settings and include the bypass token when registering your webhook URL.
+**Settings Persistence**: Toolkit preferences (such as default brand scheme, thread counts, and PAN masking preferences) persist in the user's browser `localStorage` and are also echoed by the serverless `/api/settings` endpoint.
 
-### Telegram Webhook Security Configuration
+### Telegram Webhook Security & Multi-User Configuration
 For Telegram bot integration, set the following environment variables:
 
 | Environment Variable | Required | Description |
 |----------------------|----------|-------------|
 | `TELEGRAM_SECRET_TOKEN` | Recommended in prod | Set to verify the `X-Telegram-Bot-Api-Secret-Token` header sent by Telegram webhooks. |
-| `TELEGRAM_OWNER_ID` | Recommended in prod | Set your numeric Telegram user ID to restrict bot commands exclusively to the owner. |
+| `TELEGRAM_OWNER_ID` | Optional | Set your numeric Telegram user ID to restrict bot commands exclusively to the owner. **Leave unset** if the bot is intended for shared/multi-user or group use by friends. |
 
 ### Webhook Setup Instructions
 
 1. Deploy the project to Vercel (or your HTTP host).
-2. Register your bot webhook with Telegram using `curl`:
+2. If **Vercel Authentication** is enabled on all deployments, generate an automation bypass token under **Project Settings > Deployment Protection > Protection Bypass for Automation**.
+3. Register your bot webhook with Telegram using `curl`, appending the bypass parameter if Vercel Authentication is enabled:
+
 ```bash
+# Standard Webhook Registration
 curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
      -H "Content-Type: application/json" \
      -d '{"url": "https://<YOUR_VERCEL_DOMAIN>/api/webhook", "secret_token": "<YOUR_SECRET_TOKEN>"}'
+
+# Registration with Vercel Protection Bypass for Automation
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://<YOUR_VERCEL_DOMAIN>/api/webhook?x-vercel-protection-bypass=<YOUR_BYPASS_TOKEN>", "secret_token": "<YOUR_SECRET_TOKEN>"}'
 ```
 
 ---

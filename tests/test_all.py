@@ -147,9 +147,53 @@ class TestAPIHandlers(unittest.TestCase):
 
     def test_export_handler(self):
         records = [{"pan": "4000161234567890", "brand": "Visa", "expiry": "12/28", "cvv": "123", "status": "PASS"}]
+        # Test JSON format
         code, body = call_api_handler(export_handler, {"records": records, "format": "json"})
         self.assertEqual(code, 200)
         self.assertIn("filename", body)
+        self.assertEqual(body["mime_type"], "application/json")
+
+        # Test CSV format
+        code_csv, body_csv = call_api_handler(export_handler, {"records": records, "format": "csv"})
+        self.assertEqual(code_csv, 200)
+        self.assertEqual(body_csv["mime_type"], "text/csv")
+        self.assertIn("PAN,Brand,Expiry,CVV,Status,Masked", body_csv["content"])
+
+        # Test TXT format
+        code_txt, body_txt = call_api_handler(export_handler, {"records": records, "format": "txt"})
+        self.assertEqual(code_txt, 200)
+        self.assertEqual(body_txt["mime_type"], "text/plain")
+        self.assertIn("4000161234567890|12/28|123", body_txt["content"])
+
+    def test_settings_get_and_post(self):
+        # Test GET request
+        req = DummyRequest(b"")
+        h = settings_handler.__new__(settings_handler)
+        h.rfile = req.rfile
+        h.wfile = req.wfile
+        h.headers = req.headers
+        h.send_response = req.send_response
+        h.send_header = req.send_header
+        h.end_headers = req.end_headers
+        h.do_GET()
+
+        req.wfile.seek(0)
+        body = json.loads(req.wfile.read().decode('utf-8'))
+        self.assertEqual(req.response_code, 200)
+        self.assertIn("generator", body)
+
+        # Test POST payload size limit exceeded (413 Payload Too Large)
+        huge_data = "a" * (1024 * 1024 + 100)
+        req_huge = DummyRequest(huge_data.encode('utf-8'))
+        h_huge = settings_handler.__new__(settings_handler)
+        h_huge.rfile = req_huge.rfile
+        h_huge.wfile = req_huge.wfile
+        h_huge.headers = req_huge.headers
+        h_huge.send_response = req_huge.send_response
+        h_huge.send_header = req_huge.send_header
+        h_huge.end_headers = req_huge.end_headers
+        h_huge.do_POST()
+        self.assertEqual(req_huge.response_code, 413)
 
     def test_webhook_handler(self):
         payload = {"update_id": 1, "message": {"text": "/start", "chat": {"id": 12345}}}
