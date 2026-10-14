@@ -475,6 +475,15 @@ def search_bin_db(query=""):
     return filtered
 
 
+def sanitize_csv_cell(val) -> str:
+    """Sanitize CSV cell string to prevent formula injection and unescaped quotes/newlines."""
+    s = str(val if val is not None else "")
+    if s and s[0] in ["=", "+", "-", "@", "\t", "\r"]:
+        s = "'" + s
+    s = s.replace('"', '""')
+    return f'"{s}"'
+
+
 def export_records(records, export_format="csv"):
     """
     Format records for download in CSV, JSON, or TXT.
@@ -494,7 +503,15 @@ def export_records(records, export_format="csv"):
             cvv = r.get("cvv", "N/A")
             status = r.get("status") or ("PASS" if (r.get("luhn_valid") or r.get("overall_valid") or r.get("method") == "BIN-Extrapolation" or (pan and luhn_valid(pan))) else "N/A")
             masked = r.get("masked", mask_pan(pan))
-            lines.append(f'"{pan}","{brand}","{expiry}","{cvv}","{status}","{masked}"')
+            row_cells = [
+                sanitize_csv_cell(pan),
+                sanitize_csv_cell(brand),
+                sanitize_csv_cell(expiry),
+                sanitize_csv_cell(cvv),
+                sanitize_csv_cell(status),
+                sanitize_csv_cell(masked)
+            ]
+            lines.append(",".join(row_cells))
         return "\n".join(lines), "text/csv", "cardx_export.csv"
 
     else:  # TXT

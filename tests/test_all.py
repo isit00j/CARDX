@@ -186,6 +186,18 @@ class TestAPIHandlers(unittest.TestCase):
         self.assertEqual(body_txt["mime_type"], "text/plain")
         self.assertIn("4000161234567890|12/28|123", body_txt["content"])
 
+    def test_csv_export_escaping_and_formula_neutralization(self):
+        records = [
+            {"pan": "=1+1", "brand": 'Visa "Classic"', "expiry": "12/28\nLine2", "cvv": "123", "status": "PASS", "masked": "400016xxxxxx9010"}
+        ]
+        code, body = call_api_handler(export_handler, {"records": records, "format": "csv"})
+        self.assertEqual(code, 200)
+        content = body["content"]
+        # Formula '=' neutralized with "'"
+        self.assertIn('"' + "'=1+1" + '"', content)
+        # Quotes escaped as '""'
+        self.assertIn('"Visa ""Classic"""', content)
+
     def test_extrapolated_records_csv_export_status(self):
         # Generate extrapolated records
         extrap_res = cardx_core.extrapolate_cards("4000123456789010", count=2)
@@ -261,10 +273,15 @@ class TestAPIHandlers(unittest.TestCase):
         self.assertEqual(req_huge.response_code, 413)
 
     def test_webhook_handler(self):
-        payload = {"update_id": 1, "message": {"text": "/start", "chat": {"id": 12345}}}
-        code, body = call_api_handler(webhook_handler, payload)
-        self.assertEqual(code, 200)
-        self.assertEqual(body["method"], "sendMessage")
+        import os
+        os.environ["CARDX_DEV_MODE"] = "1"
+        try:
+            payload = {"update_id": 1, "message": {"text": "/start", "chat": {"id": 12345}}}
+            code, body = call_api_handler(webhook_handler, payload)
+            self.assertEqual(code, 200)
+            self.assertEqual(body["method"], "sendMessage")
+        finally:
+            os.environ.pop("CARDX_DEV_MODE", None)
 
     def test_webhook_secret_token_validation(self):
         import os
@@ -308,7 +325,8 @@ class TestAPIHandlers(unittest.TestCase):
             ("VERCEL_ENV", "production"),
             ("ENV", "production"),
             ("ENVIRONMENT", "production"),
-            ("NODE_ENV", "production")
+            ("NODE_ENV", "production"),
+            ("UNKNOWN_ENV", "some_value")  # Unknown environment fails closed
         ]
 
         try:
@@ -335,6 +353,7 @@ class TestAPIHandlers(unittest.TestCase):
     def test_webhook_owner_id_restriction(self):
         import os
         os.environ["TELEGRAM_OWNER_ID"] = "999888"
+        os.environ["CARDX_DEV_MODE"] = "1"
         try:
             # Test missing or wrong sender ID -> unauthorized message
             payload_wrong = {
@@ -355,6 +374,7 @@ class TestAPIHandlers(unittest.TestCase):
             self.assertIn("CARDX Cyberpunk Toolkit Bot", body2["text"])
         finally:
             os.environ.pop("TELEGRAM_OWNER_ID", None)
+            os.environ.pop("CARDX_DEV_MODE", None)
 
 
 if __name__ == '__main__':

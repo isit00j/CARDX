@@ -16,17 +16,18 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            # Enforce Telegram Secret Token validation on all documented production hosts or when TELEGRAM_SECRET_TOKEN is set
+            # Webhook authentication fails closed by default.
+            # Bypassed only if explicitly running in local development mode (CARDX_DEV_MODE=1 or ENV/ENVIRONMENT=development/local/dev/test) AND TELEGRAM_SECRET_TOKEN is not set.
             secret_token = os.environ.get("TELEGRAM_SECRET_TOKEN")
             env_val = (os.environ.get("ENV") or os.environ.get("ENVIRONMENT") or os.environ.get("NODE_ENV") or "").lower()
-            is_prod = bool(
-                os.environ.get("VERCEL") or
-                os.environ.get("VERCEL_ENV") or
-                env_val == "production"
+            is_dev = (
+                os.environ.get("CARDX_DEV_MODE") == "1" or
+                env_val in ["development", "dev", "local", "test"]
             )
             req_secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token")
 
-            if secret_token or is_prod:
+            # Require valid secret token in non-development environments OR whenever secret_token is set
+            if not is_dev or secret_token:
                 if not secret_token or req_secret != secret_token:
                     self.send_response(401)
                     self.send_header('Content-Type', 'application/json')

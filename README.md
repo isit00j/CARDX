@@ -152,6 +152,21 @@ python cli.py
 | requests | ≥2.32.3 | Optional BIN table updates |
 | pyyaml | ≥6.0.2 | Template files |
 | tabulate | ≥0.9.0 | Plain-text result rendering |
+| playwright *(test)* | ≥1.40.0 | Frontend browser E2E integration test suite |
+
+### Running Unit & Integration Tests
+
+Execute the complete automated test suite locally:
+
+```bash
+# Run all core and API unit tests
+python3 -m unittest discover -s tests
+
+# To run Playwright browser tests (optional):
+pip install playwright
+playwright install chromium
+python3 -m unittest tests/test_frontend.py
+```
 
 ---
 

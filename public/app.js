@@ -248,9 +248,9 @@ function renderValidationResult(data, container) {
   const table = document.createElement('table');
   table.className = 'data-table';
 
-  const displayPan = appState.settings.mask ? (data.masked || mask_pan(data.pan)) : (data.formatted || data.pan);
+  const displayPan = appState.settings.mask ? (data.masked || (data.pan ? `${data.pan.slice(0, 6)}xxxxxx${data.pan.slice(-4)}` : '')) : (data.formatted || data.pan);
   const rows = [
-    ['Card PAN', appState.settings.mask ? `${data.formatted || ''} (${data.masked || ''})` : displayPan],
+    ['Card PAN', displayPan],
     ['Brand Scheme', data.brand || 'Unknown'],
     ['Luhn Mod-10 Check', data.is_luhn_valid ? '✅ PASS' : '❌ FAIL'],
     ['Length Check', `${data.length || 0} digits (${data.is_length_valid ? 'Valid' : 'Invalid, expected ' + (data.expected_length || '')})`],
@@ -366,29 +366,62 @@ function initBulkChecker() {
       const text = inputBulk.value.trim();
       if (!text) return;
 
-      const workers = appState.settings.threads || 8;
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) return;
+
+      const workerCount = Math.max(1, parseInt(appState.settings.threads, 10) || 8);
       btnBulk.disabled = true;
-      btnBulk.innerText = `🚀 Validating List (${workers} Workers)...`;
+      btnBulk.innerText = `🚀 Validating List (${workerCount} Workers)...`;
 
       try {
-        const res = await fetch('/api/bulk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cards_text: text })
-        });
-        const data = await res.json();
-
-        statsSummary.style.display = 'inline-block';
-        document.getElementById('bulk-total-count').textContent = data.total || 0;
-        document.getElementById('bulk-pass-count').textContent = data.passed || 0;
-        document.getElementById('bulk-fail-count').textContent = data.failed || 0;
-
-        if (data.results && Array.isArray(data.results)) {
-          const bulkRecords = data.results.map(r => r.res).filter(Boolean);
-          addSessionRecords(bulkRecords);
+        // Divide input lines into parallel worker chunk batches
+        const chunkSize = Math.max(1, Math.ceil(lines.length / workerCount));
+        const chunks = [];
+        for (let i = 0; i < lines.length; i += chunkSize) {
+          chunks.push(lines.slice(i, i + chunkSize));
         }
 
-        renderBulkTable(data.results, tableContainer);
+        // Dispatch concurrent API worker requests using Promise.all
+        const workerPromises = chunks.map(chunkLines =>
+          fetch('/api/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cards_text: chunkLines.join('\n') })
+          }).then(r => r.json())
+        );
+
+        const chunkResponses = await Promise.all(workerPromises);
+
+        // Aggregate chunk results
+        let totalCount = 0;
+        let passCount = 0;
+        let failCount = 0;
+        const mergedResults = [];
+
+        chunkResponses.forEach(data => {
+          totalCount += data.total || 0;
+          passCount += data.passed || 0;
+          failCount += data.failed || 0;
+          if (data.results && Array.isArray(data.results)) {
+            data.results.forEach(r => {
+              mergedResults.push({
+                id: mergedResults.length + 1,
+                input: r.input,
+                res: r.res
+              });
+            });
+          }
+        });
+
+        statsSummary.style.display = 'inline-block';
+        document.getElementById('bulk-total-count').textContent = totalCount;
+        document.getElementById('bulk-pass-count').textContent = passCount;
+        document.getElementById('bulk-fail-count').textContent = failCount;
+
+        const bulkRecords = mergedResults.map(r => r.res).filter(Boolean);
+        addSessionRecords(bulkRecords);
+
+        renderBulkTable(mergedResults, tableContainer);
       } catch (err) {
         tableContainer.replaceChildren();
         const errDiv = document.createElement('div');

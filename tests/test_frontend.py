@@ -3,9 +3,17 @@ import os
 import json
 import time
 import subprocess
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+
 
 class TestFrontendSessionCollection(unittest.TestCase):
+    def setUp(self):
+        if not PLAYWRIGHT_AVAILABLE:
+            raise unittest.SkipTest("Playwright is not installed in the environment.")
     @classmethod
     def setUpClass(cls):
         # Start background HTTP server serving public/ on port 3000
@@ -106,6 +114,121 @@ class TestFrontendSessionCollection(unittest.TestCase):
             self.assertEqual(last_records[2]["pan"], "4000123456789010")
             self.assertEqual(last_records[3]["pan"], "5156761234567890")
             self.assertEqual(last_records[4]["pan"], "4000169999999999")
+
+            browser.close()
+
+    def test_masked_pan_rendering_no_full_pan_leak(self):
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto("http://localhost:3000")
+            page.wait_for_timeout(500)
+
+            fake_pan = "4000123456789010"
+            page.route("**/api/check", lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({
+                    "pan": fake_pan, "brand": "Visa", "formatted": "4000 1234 5678 9010", "masked": "400012xxxxxx9010",
+                    "overall_valid": True, "is_luhn_valid": True, "length": 16, "expected_length": 16, "is_length_valid": True,
+                    "expiry": "12/28", "is_expiry_valid": True, "cvv": "123", "is_cvv_valid": True,
+                    "bin_info": {"issuer": "Chase Bank", "flag": "🇺🇸", "country": "US"}
+                })
+            ))
+
+            # 1. Verify with masking ENABLED (default)
+            page.get_by_role("tab", name="✅ Validator").click()
+            page.locator("#check-input").fill(fake_pan)
+            page.get_by_role("button", name="🔍 Validate Card Now").click()
+            page.wait_for_timeout(300)
+
+            results_html = page.locator("#check-results").inner_html()
+            self.assertNotIn("4000123456789010", results_html, "Full unmasked PAN must not appear in rendered DOM when masking is enabled")
+            self.assertNotIn("4000 1234 5678 9010", results_html, "Formatted unmasked PAN must not appear in rendered DOM when masking is enabled")
+            self.assertIn("400012xxxxxx9010", results_html, "Masked PAN must be present in rendered DOM when masking is enabled")
+
+            # 2. Toggle masking DISABLED in Settings
+            page.get_by_role("tab", name="⚙️ Settings").click()
+            page.locator("#setting-mask-output").uncheck()
+            page.get_by_role("button", name="💾 Save Configuration").click()
+            page.wait_for_timeout(200)
+
+            # Re-run validation with masking DISABLED
+            page.get_by_role("tab", name="✅ Validator").click()
+            page.get_by_role("button", name="🔍 Validate Card Now").click()
+            page.wait_for_timeout(300)
+
+            unmasked_html = page.locator("#check-results").inner_html()
+            self.assertIn("4000 1234 5678 9010", unmasked_html, "Formatted PAN should appear in DOM when masking is explicitly disabled")
+
+            browser.close()
+
+    def test_real_frontend_export_flow(self):
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto("http://localhost:3000")
+            page.wait_for_timeout(500)
+
+            export_payload_holder = []
+
+            def handle_export_route(route):
+                request_data = json.loads(route.request.post_data)
+                export_payload_holder.append(request_data)
+                # Formulate escaped CSV response
+                records = request_data.get("records", [])
+                csv_lines = ["PAN,Brand,Expiry,CVV,Status,Masked"]
+                for r in records:
+                    pan = r.get("pan", "")
+                    if pan.startswith("="):
+                        pan = "'" + pan
+                    csv_lines.append(f'"{pan}","{r.get("brand","")}","{r.get("expiry","")}","{r.get("cvv","")}","PASS","{r.get("masked","")}"')
+                content = "\n".join(csv_lines)
+
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps({
+                        "content": content,
+                        "mime_type": "text/csv",
+                        "filename": "cardx_export.csv"
+                    })
+                )
+
+            page.route("**/api/export", handle_export_route)
+
+            page.route("**/api/check", lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({
+                    "pan": "=SUM(1,2)", "brand": "Visa", "formatted": "=SUM(1,2)", "masked": "400012xxxxxx9010",
+                    "overall_valid": True, "is_luhn_valid": True, "length": 16, "expected_length": 16, "is_length_valid": True,
+                    "expiry": "12/28", "is_expiry_valid": True, "cvv": "123", "is_cvv_valid": True,
+                    "bin_info": {"issuer": "Chase Bank", "flag": "🇺🇸", "country": "US"}
+                })
+            ))
+
+            # 1. Run validation
+            page.get_by_role("tab", name="✅ Validator").click()
+            page.locator("#check-input").fill("4000123456789010|12/28|123")
+            page.get_by_role("button", name="🔍 Validate Card Now").click()
+            page.wait_for_timeout(300)
+
+            # 2. Trigger Export UI Action
+            page.get_by_role("tab", name="📤 Export").click()
+            page.wait_for_timeout(200)
+
+            with page.expect_download() as download_info:
+                page.locator("#btn-export-download").click()
+
+            download = download_info.value
+            self.assertEqual(download.suggested_filename, "cardx_export.csv")
+
+            # Verify intercepted export request payload
+            self.assertEqual(len(export_payload_holder), 1)
+            records = export_payload_holder[0]["records"]
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0]["pan"], "=SUM(1,2)")
 
             browser.close()
 
