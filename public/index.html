@@ -43,17 +43,17 @@
     </header>
 
     <!-- Navigation Bar -->
-    <nav class="nav-tabs" id="nav-tabs">
-      <button class="tab-btn active" data-tab="tab-generator">🎴 Generator</button>
-      <button class="tab-btn" data-tab="tab-checker">✅ Validator</button>
-      <button class="tab-btn" data-tab="tab-bin">🏷️ BIN Lookup</button>
-      <button class="tab-btn" data-tab="tab-bulk">📂 Bulk Checker</button>
-      <button class="tab-btn" data-tab="tab-bindb">🗄️ BIN Database</button>
-      <button class="tab-btn" data-tab="tab-extrap">🔮 Extrapolator</button>
-      <button class="tab-btn" data-tab="tab-templates">🧩 Templates</button>
-      <button class="tab-btn" data-tab="tab-export">📤 Export</button>
-      <button class="tab-btn" data-tab="tab-settings">⚙️ Settings</button>
-      <button class="tab-btn" data-tab="tab-telegram">🤖 Telegram Bot</button>
+    <nav class="nav-tabs" id="nav-tabs" role="tablist">
+      <button class="tab-btn active" data-tab="tab-generator" role="tab" aria-selected="true" aria-controls="tab-generator">🎴 Generator</button>
+      <button class="tab-btn" data-tab="tab-checker" role="tab" aria-selected="false" aria-controls="tab-checker">✅ Validator</button>
+      <button class="tab-btn" data-tab="tab-bin" role="tab" aria-selected="false" aria-controls="tab-bin">🏷️ BIN Lookup</button>
+      <button class="tab-btn" data-tab="tab-bulk" role="tab" aria-selected="false" aria-controls="tab-bulk">📂 Bulk Checker</button>
+      <button class="tab-btn" data-tab="tab-bindb" role="tab" aria-selected="false" aria-controls="tab-bindb">🗄️ BIN Database</button>
+      <button class="tab-btn" data-tab="tab-extrap" role="tab" aria-selected="false" aria-controls="tab-extrap">🔮 Extrapolator</button>
+      <button class="tab-btn" data-tab="tab-templates" role="tab" aria-selected="false" aria-controls="tab-templates">🧩 Templates</button>
+      <button class="tab-btn" data-tab="tab-export" role="tab" aria-selected="false" aria-controls="tab-export">📤 Export</button>
+      <button class="tab-btn" data-tab="tab-settings" role="tab" aria-selected="false" aria-controls="tab-settings">⚙️ Settings</button>
+      <button class="tab-btn" data-tab="tab-telegram" role="tab" aria-selected="false" aria-controls="tab-telegram">🤖 Telegram Bot</button>
     </nav>
 
     <!-- Main Content Area -->
@@ -249,6 +249,9 @@
       <section class="tab-content" id="tab-settings">
         <div class="panel" style="max-width: 650px; margin: 0 auto;">
           <h2 class="panel-title"><span class="icon">⚙️</span> Toolkit Preferences & Defaults</h2>
+          <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.85rem;">
+            ℹ️ Settings saved here are stored in your browser's local storage and synced with server defaults.
+          </p>
           <form id="settings-form" onsubmit="return false;">
             <div class="form-group">
               <label>Default Generator Scheme</label>
@@ -257,15 +260,20 @@
                 <option value="Mastercard">Mastercard</option>
                 <option value="Amex">American Express</option>
                 <option value="Discover">Discover</option>
+                <option value="Diners">Diners Club</option>
+                <option value="JCB">JCB</option>
+                <option value="UnionPay">UnionPay</option>
+                <option value="Maestro">Maestro</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Bulk Processing Thread Emulation</label>
+              <label>Bulk Processing Worker Threads (Emulated Worker Pool)</label>
               <select id="setting-threads" class="form-control">
                 <option value="4">4 Workers</option>
                 <option value="8" selected>8 Workers (Optimal)</option>
                 <option value="16">16 Workers</option>
               </select>
+              <span class="help-text">Simulated client-side concurrent batch worker thread pool limit.</span>
             </div>
             <div class="form-group checkbox-group">
               <label><input type="checkbox" id="setting-mask-output" checked> Automatically mask PANs in validation displays</label>
@@ -304,6 +312,14 @@
             <div class="form-group">
               <label>Simulate Bot Command</label>
               <input type="text" id="tg-cmd-input" class="form-control mono" value="/chk 4000123456789010|12/28|123">
+            </div>
+            <div class="form-group">
+              <label>Simulated Sender Telegram ID (Optional)</label>
+              <input type="text" id="tg-sender-input" class="form-control mono" placeholder="e.g. 999888">
+            </div>
+            <div class="form-group">
+              <label>Webhook Secret Token (Optional Header)</label>
+              <input type="password" id="tg-secret-input" class="form-control mono" placeholder="X-Telegram-Bot-Api-Secret-Token">
             </div>
             <button class="btn btn-primary btn-block" id="btn-test-tg">🚀 Send Test Webhook Message</button>
 

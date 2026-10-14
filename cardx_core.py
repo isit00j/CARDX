@@ -188,12 +188,16 @@ def generate_single_card(brand="Visa", prefix="", custom_length=None):
 
 def generate_cards(brand="Visa", count=10, bin_prefix="", custom_pattern=""):
     """Generate multiple cards according to criteria or pattern."""
-    count = max(1, min(int(count), 100))
+    try:
+        count = int(count)
+    except (ValueError, TypeError):
+        count = 10
+    count = max(1, min(count, 100))
     results = []
 
-    if custom_pattern:
+    if custom_pattern and str(custom_pattern).strip():
         for _ in range(count):
-            results.append(generate_from_pattern(custom_pattern))
+            results.append(generate_from_pattern(str(custom_pattern).strip()))
         return results
 
     # Determine brand from bin_prefix if prefix provided
@@ -261,6 +265,14 @@ def validate_card(card_input: str):
     Validate single card string (accepts PAN or PAN|MM/YY|CVV).
     Returns complete breakdown of validity metrics.
     """
+    if not card_input or not isinstance(card_input, str):
+        return {
+            "valid": False,
+            "error": "No card input provided",
+            "overall_valid": False,
+            "status": "DECLINED / FAIL"
+        }
+
     parts = [p.strip() for p in card_input.split("|")]
     raw_pan = only_digits(parts[0])
 
@@ -268,7 +280,12 @@ def validate_card(card_input: str):
     cvv_input = parts[2] if len(parts) > 2 else None
 
     if not raw_pan:
-        return {"valid": False, "error": "No digits found in input"}
+        return {
+            "valid": False,
+            "error": "No digits found in input",
+            "overall_valid": False,
+            "status": "DECLINED / FAIL"
+        }
 
     brand = detect_brand(raw_pan)
     is_luhn = luhn_valid(raw_pan)
@@ -384,31 +401,37 @@ def extrapolate_cards(seed_input: str, count=10):
     Extrapolate candidate cards from a base PAN or seed card line.
     Uses pattern variation on middle/last digits with Luhn verification.
     """
-    seed_res = validate_card(seed_input)
-    pan = seed_res["pan"]
-    brand = seed_res["brand"]
+    try:
+        count = int(count)
+    except (ValueError, TypeError):
+        count = 10
+    count = max(1, min(count, 50))
 
-    if len(pan) < 12:
+    seed_res = validate_card(seed_input)
+    pan = seed_res.get("pan", "")
+    brand = seed_res.get("brand", "Unknown")
+
+    if not pan or len(pan) < 12:
         return {"error": "Seed PAN must be at least 12 digits"}
 
+    target_length = len(pan)
     bin_6 = pan[:6]
-    last_4 = pan[-4:] if len(pan) >= 10 else pan[-2:]
-    middle_len = len(pan) - len(bin_6) - 1  # exclude check digit
+    needed_mid = target_length - 1 - len(bin_6)
 
     extrapolated = []
-    seen = set()
+    seen = {pan}
 
-    # 1. Same BIN & pattern variation
-    for _ in range(count * 3):
+    # Same BIN & pattern variation
+    for _ in range(count * 10):
         if len(extrapolated) >= count:
             break
-        # Vary middle digits while maintaining prefix
-        mid_digits = "".join(str(random.randint(0, 9)) for _ in range(middle_len - len(bin_6)))
+
+        mid_digits = "".join(str(random.randint(0, 9)) for _ in range(needed_mid))
         body = bin_6 + mid_digits
         check = luhn_check_digit(body)
         candidate = body + str(check)
 
-        if candidate not in seen:
+        if candidate not in seen and len(candidate) == target_length and luhn_valid(candidate):
             seen.add(candidate)
             expiry = seed_res["expiry"] if seed_res["expiry"] != "N/A" else generate_expiry()
             cvv = seed_res["cvv"] if seed_res["cvv"] != "N/A" else generate_cvv(brand)
@@ -420,6 +443,8 @@ def extrapolate_cards(seed_input: str, count=10):
                 "expiry": expiry,
                 "cvv": cvv,
                 "pipe_format": f"{candidate}|{expiry}|{cvv}",
+                "luhn_valid": True,
+                "status": "PASS",
                 "method": "BIN-Extrapolation"
             })
 
@@ -450,6 +475,15 @@ def search_bin_db(query=""):
     return filtered
 
 
+def sanitize_csv_cell(val) -> str:
+    """Sanitize CSV cell string to prevent formula injection and unescaped quotes/newlines."""
+    s = str(val if val is not None else "")
+    if s and s[0] in ["=", "+", "-", "@", "\t", "\r"]:
+        s = "'" + s
+    s = s.replace('"', '""')
+    return f'"{s}"'
+
+
 def export_records(records, export_format="csv"):
     """
     Format records for download in CSV, JSON, or TXT.
@@ -467,9 +501,17 @@ def export_records(records, export_format="csv"):
             brand = r.get("brand", "Unknown")
             expiry = r.get("expiry", "N/A")
             cvv = r.get("cvv", "N/A")
-            status = r.get("status") or ("PASS" if r.get("luhn_valid") or r.get("overall_valid") else "N/A")
+            status = r.get("status") or ("PASS" if (r.get("luhn_valid") or r.get("overall_valid") or r.get("method") == "BIN-Extrapolation" or (pan and luhn_valid(pan))) else "N/A")
             masked = r.get("masked", mask_pan(pan))
-            lines.append(f'"{pan}","{brand}","{expiry}","{cvv}","{status}","{masked}"')
+            row_cells = [
+                sanitize_csv_cell(pan),
+                sanitize_csv_cell(brand),
+                sanitize_csv_cell(expiry),
+                sanitize_csv_cell(cvv),
+                sanitize_csv_cell(status),
+                sanitize_csv_cell(masked)
+            ]
+            lines.append(",".join(row_cells))
         return "\n".join(lines), "text/csv", "cardx_export.csv"
 
     else:  # TXT
