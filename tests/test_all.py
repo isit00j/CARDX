@@ -300,22 +300,37 @@ class TestAPIHandlers(unittest.TestCase):
 
     def test_webhook_production_secret_enforcement(self):
         import os
-        os.environ["VERCEL"] = "1"
+        # Ensure TELEGRAM_SECRET_TOKEN is explicitly cleared to test missing secret behavior
+        old_secret = os.environ.pop("TELEGRAM_SECRET_TOKEN", None)
+
+        prod_vars = [
+            ("VERCEL", "1"),
+            ("VERCEL_ENV", "production"),
+            ("ENV", "production"),
+            ("ENVIRONMENT", "production"),
+            ("NODE_ENV", "production")
+        ]
+
         try:
-            # Under VERCEL production, if TELEGRAM_SECRET_TOKEN is unset, webhook fails closed (401)
             payload = {"update_id": 1, "message": {"text": "/help", "chat": {"id": 12345}}}
-            req = DummyRequest(json.dumps(payload).encode('utf-8'))
-            h = webhook_handler.__new__(webhook_handler)
-            h.rfile = req.rfile
-            h.wfile = req.wfile
-            h.headers = req.headers
-            h.send_response = req.send_response
-            h.send_header = req.send_header
-            h.end_headers = req.end_headers
-            h.do_POST()
-            self.assertEqual(req.response_code, 401)
+            for env_key, env_val in prod_vars:
+                os.environ[env_key] = env_val
+                try:
+                    req = DummyRequest(json.dumps(payload).encode('utf-8'))
+                    h = webhook_handler.__new__(webhook_handler)
+                    h.rfile = req.rfile
+                    h.wfile = req.wfile
+                    h.headers = req.headers
+                    h.send_response = req.send_response
+                    h.send_header = req.send_header
+                    h.end_headers = req.end_headers
+                    h.do_POST()
+                    self.assertEqual(req.response_code, 401, f"Failed closed check for {env_key}={env_val}")
+                finally:
+                    os.environ.pop(env_key, None)
         finally:
-            os.environ.pop("VERCEL", None)
+            if old_secret is not None:
+                os.environ["TELEGRAM_SECRET_TOKEN"] = old_secret
 
     def test_webhook_owner_id_restriction(self):
         import os

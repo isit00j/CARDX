@@ -26,6 +26,7 @@ const appState = {
     mask: true
   }
 };
+window.appState = appState;
 
 function updateStatsCounters(totalDelta = 0, approvedDelta = 0, declinedDelta = 0) {
   appState.stats.total += totalDelta;
@@ -247,8 +248,9 @@ function renderValidationResult(data, container) {
   const table = document.createElement('table');
   table.className = 'data-table';
 
+  const displayPan = appState.settings.mask ? (data.masked || mask_pan(data.pan)) : (data.formatted || data.pan);
   const rows = [
-    ['Card PAN', `${data.formatted || ''} (${data.masked || ''})`],
+    ['Card PAN', appState.settings.mask ? `${data.formatted || ''} (${data.masked || ''})` : displayPan],
     ['Brand Scheme', data.brand || 'Unknown'],
     ['Luhn Mod-10 Check', data.is_luhn_valid ? '✅ PASS' : '❌ FAIL'],
     ['Length Check', `${data.length || 0} digits (${data.is_length_valid ? 'Valid' : 'Invalid, expected ' + (data.expected_length || '')})`],
@@ -364,8 +366,9 @@ function initBulkChecker() {
       const text = inputBulk.value.trim();
       if (!text) return;
 
+      const workers = appState.settings.threads || 8;
       btnBulk.disabled = true;
-      btnBulk.innerText = '🚀 Validating List...';
+      btnBulk.innerText = `🚀 Validating List (${workers} Workers)...`;
 
       try {
         const res = await fetch('/api/bulk', {
@@ -432,7 +435,7 @@ function renderBulkTable(results, container) {
     tdId.textContent = `#${r.id || ''}`;
 
     const tdPan = document.createElement('td');
-    tdPan.textContent = res.masked || '';
+    tdPan.textContent = appState.settings.mask ? (res.masked || mask_pan(res.pan)) : (res.formatted || res.pan);
 
     const tdBrand = document.createElement('td');
     tdBrand.textContent = res.brand || 'Unknown';
