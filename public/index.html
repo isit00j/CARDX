@@ -249,6 +249,9 @@
       <section class="tab-content" id="tab-settings">
         <div class="panel" style="max-width: 650px; margin: 0 auto;">
           <h2 class="panel-title"><span class="icon">⚙️</span> Toolkit Preferences & Defaults</h2>
+          <p style="color: var(--text-dim); margin-bottom: 1rem; font-size: 0.85rem;">
+            ℹ️ Settings saved here are stored in your browser's local storage and synced with server defaults.
+          </p>
           <form id="settings-form" onsubmit="return false;">
             <div class="form-group">
               <label>Default Generator Scheme</label>
@@ -257,15 +260,20 @@
                 <option value="Mastercard">Mastercard</option>
                 <option value="Amex">American Express</option>
                 <option value="Discover">Discover</option>
+                <option value="Diners">Diners Club</option>
+                <option value="JCB">JCB</option>
+                <option value="UnionPay">UnionPay</option>
+                <option value="Maestro">Maestro</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Bulk Processing Thread Emulation</label>
+              <label>Bulk Processing Worker Threads (Emulated Worker Pool)</label>
               <select id="setting-threads" class="form-control">
                 <option value="4">4 Workers</option>
                 <option value="8" selected>8 Workers (Optimal)</option>
                 <option value="16">16 Workers</option>
               </select>
+              <span class="help-text">Simulated client-side concurrent batch worker thread pool limit.</span>
             </div>
             <div class="form-group checkbox-group">
               <label><input type="checkbox" id="setting-mask-output" checked> Automatically mask PANs in validation displays</label>
@@ -304,6 +312,10 @@
             <div class="form-group">
               <label>Simulate Bot Command</label>
               <input type="text" id="tg-cmd-input" class="form-control mono" value="/chk 4000123456789010|12/28|123">
+            </div>
+            <div class="form-group">
+              <label>Simulated Sender Telegram ID (Optional)</label>
+              <input type="text" id="tg-sender-input" class="form-control mono" placeholder="e.g. 999888">
             </div>
             <div class="form-group">
               <label>Webhook Secret Token (Optional Header)</label>

@@ -717,6 +717,20 @@ function initSettings() {
   const brandSelect = document.getElementById('setting-default-brand');
   const threadsSelect = document.getElementById('setting-threads');
   const maskCheckbox = document.getElementById('setting-mask-output');
+  const genBrandSelect = document.getElementById('gen-brand');
+
+  function applySettingsToUi(settings) {
+    if (settings.default_brand) {
+      appState.settings.defaultBrand = settings.default_brand;
+      if (genBrandSelect) genBrandSelect.value = settings.default_brand;
+    }
+    if (settings.threads) {
+      appState.settings.threads = parseInt(settings.threads, 10) || 8;
+    }
+    if (typeof settings.mask === 'boolean') {
+      appState.settings.mask = settings.mask;
+    }
+  }
 
   // Load saved settings from localStorage
   const savedSettings = localStorage.getItem('cardx_settings');
@@ -726,6 +740,7 @@ function initSettings() {
       if (parsed.default_brand && brandSelect) brandSelect.value = parsed.default_brand;
       if (parsed.threads && threadsSelect) threadsSelect.value = parsed.threads;
       if (typeof parsed.mask === 'boolean' && maskCheckbox) maskCheckbox.checked = parsed.mask;
+      applySettingsToUi(parsed);
     } catch (e) {
       console.error('Failed to parse saved settings:', e);
     }
@@ -739,8 +754,9 @@ function initSettings() {
 
       const payload = { default_brand, threads, mask };
 
-      // Save in browser localStorage immediately
+      // Save in browser localStorage immediately and apply to UI state
       localStorage.setItem('cardx_settings', JSON.stringify(payload));
+      applySettingsToUi(payload);
 
       try {
         const res = await fetch('/api/settings', {
@@ -769,6 +785,7 @@ function initSettings() {
 function initTelegram() {
   const btnTest = document.getElementById('btn-test-tg');
   const inputCmd = document.getElementById('tg-cmd-input');
+  const inputSender = document.getElementById('tg-sender-input');
   const inputSecret = document.getElementById('tg-secret-input');
   const boxOutput = document.getElementById('tg-response-box');
 
@@ -780,11 +797,15 @@ function initTelegram() {
       btnTest.disabled = true;
       btnTest.innerText = '🚀 Sending Payload...';
 
+      const senderVal = (inputSender && inputSender.value.trim()) ? inputSender.value.trim() : '999888';
+      const senderId = /^\d+$/.test(senderVal) ? parseInt(senderVal, 10) : senderVal;
+
       try {
         const payload = {
           update_id: 10001,
           message: {
             message_id: 1,
+            from: { id: senderId, is_bot: false, first_name: 'Tester' },
             chat: { id: 999888, type: 'private' },
             text: text
           }

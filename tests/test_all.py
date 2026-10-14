@@ -186,6 +186,50 @@ class TestAPIHandlers(unittest.TestCase):
         self.assertEqual(body_txt["mime_type"], "text/plain")
         self.assertIn("4000161234567890|12/28|123", body_txt["content"])
 
+    def test_extrapolated_records_csv_export_status(self):
+        # Generate extrapolated records
+        extrap_res = cardx_core.extrapolate_cards("4000123456789010", count=2)
+        records = extrap_res["extrapolated"]
+        self.assertGreaterEqual(len(records), 1)
+
+        # Export as CSV
+        code, body = call_api_handler(export_handler, {"records": records, "format": "csv"})
+        self.assertEqual(code, 200)
+        csv_content = body["content"]
+        lines = csv_content.strip().split("\n")
+        self.assertGreaterEqual(len(lines), 2)
+        # Verify status column for extrapolated records shows "PASS" and not "N/A"
+        for line in lines[1:]:
+            self.assertIn('"PASS"', line)
+            self.assertNotIn('"N/A"', line)
+
+    def test_session_records_collection_and_export_across_all_ops(self):
+        session_records = []
+
+        # 1. Card Generation
+        _, gen_body = call_api_handler(generate_handler, {"brand": "Visa", "count": 2})
+        session_records.extend(gen_body.get("cards", []))
+
+        # 2. Single Card Validation
+        _, check_body = call_api_handler(check_handler, {"card": "4000123456789010|12/28|123"})
+        session_records.append(check_body)
+
+        # 3. Bulk Validation
+        _, bulk_body = call_api_handler(bulk_handler, {"cards_text": "5156761234567890|05/29|456"})
+        bulk_records = [r["res"] for r in bulk_body.get("results", []) if "res" in r]
+        session_records.extend(bulk_records)
+
+        # 4. Card Extrapolation
+        _, extrap_body = call_api_handler(extrapolate_handler, {"seed": "4000123456789010", "count": 2})
+        session_records.extend(extrap_body.get("extrapolated", []))
+
+        # Export session records across all 4 operations
+        code, body = call_api_handler(export_handler, {"records": session_records, "format": "csv"})
+        self.assertEqual(code, 200)
+        csv_lines = body["content"].strip().split("\n")
+        # Header + 2 gen + 1 check + 1 bulk + 2 extrap = 7 lines
+        self.assertEqual(len(csv_lines), 7)
+
     def test_settings_get_and_post(self):
         # Test GET request
         req = DummyRequest(b"")
@@ -253,6 +297,25 @@ class TestAPIHandlers(unittest.TestCase):
             self.assertEqual(req2.response_code, 200)
         finally:
             os.environ.pop("TELEGRAM_SECRET_TOKEN", None)
+
+    def test_webhook_production_secret_enforcement(self):
+        import os
+        os.environ["VERCEL"] = "1"
+        try:
+            # Under VERCEL production, if TELEGRAM_SECRET_TOKEN is unset, webhook fails closed (401)
+            payload = {"update_id": 1, "message": {"text": "/help", "chat": {"id": 12345}}}
+            req = DummyRequest(json.dumps(payload).encode('utf-8'))
+            h = webhook_handler.__new__(webhook_handler)
+            h.rfile = req.rfile
+            h.wfile = req.wfile
+            h.headers = req.headers
+            h.send_response = req.send_response
+            h.send_header = req.send_header
+            h.end_headers = req.end_headers
+            h.do_POST()
+            self.assertEqual(req.response_code, 401)
+        finally:
+            os.environ.pop("VERCEL", None)
 
     def test_webhook_owner_id_restriction(self):
         import os

@@ -443,6 +443,8 @@ def extrapolate_cards(seed_input: str, count=10):
                 "expiry": expiry,
                 "cvv": cvv,
                 "pipe_format": f"{candidate}|{expiry}|{cvv}",
+                "luhn_valid": True,
+                "status": "PASS",
                 "method": "BIN-Extrapolation"
             })
 
@@ -490,7 +492,7 @@ def export_records(records, export_format="csv"):
             brand = r.get("brand", "Unknown")
             expiry = r.get("expiry", "N/A")
             cvv = r.get("cvv", "N/A")
-            status = r.get("status") or ("PASS" if r.get("luhn_valid") or r.get("overall_valid") else "N/A")
+            status = r.get("status") or ("PASS" if (r.get("luhn_valid") or r.get("overall_valid") or r.get("method") == "BIN-Extrapolation" or (pan and luhn_valid(pan))) else "N/A")
             masked = r.get("masked", mask_pan(pan))
             lines.append(f'"{pan}","{brand}","{expiry}","{cvv}","{status}","{masked}"')
         return "\n".join(lines), "text/csv", "cardx_export.csv"
