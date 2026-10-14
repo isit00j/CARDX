@@ -117,6 +117,54 @@ class TestFrontendSessionCollection(unittest.TestCase):
 
             browser.close()
 
+    def test_generator_unmasked_pan_display_and_copy(self):
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(permissions=['clipboard-read', 'clipboard-write'])
+            page = context.new_page()
+            page.goto("http://localhost:3000")
+            page.wait_for_timeout(500)
+
+            fake_generated = [
+                {"pan": "4000161111111111", "brand": "Visa", "pipe_format": "400016xxxxxx1111|12/28|123", "formatted": "4000 16xx xxxx 1111", "masked": "400016xxxxxx1111", "expiry": "12/28", "cvv": "123"},
+                {"pan": "4000162222222222", "brand": "Visa", "pipe_format": "400016xxxxxx2222|12/28|123", "formatted": "4000 16xx xxxx 2222", "masked": "400016xxxxxx2222", "expiry": "12/28", "cvv": "123"}
+            ]
+
+            page.route("**/api/generate", lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"count": 2, "cards": fake_generated})
+            ))
+
+            # 1. Generate test cards with default validator masking ENABLED
+            page.get_by_role("button", name="⚡ Generate Test Cards").click()
+            page.wait_for_timeout(300)
+
+            gen_results_html = page.locator("#gen-results").inner_html()
+            # Verify complete PAN is present and no xxxxx masking appears in generator output
+            self.assertIn("4000161111111111", gen_results_html, "Complete synthetic test PAN must appear in generator output DOM")
+            self.assertIn("4000162222222222", gen_results_html, "Complete synthetic test PAN must appear in generator output DOM")
+            self.assertNotIn("400016xxxxxx1111", gen_results_html, "Masked xxxxx PAN must not appear in generator output DOM")
+
+            # 2. Test individual card Copy button
+            first_copy_btn = page.locator("#gen-results .card-item").first.get_by_role("button", name="📋 Copy")
+            first_copy_btn.click()
+            page.wait_for_timeout(200)
+
+            copied_single = page.evaluate("navigator.clipboard.readText()")
+            self.assertEqual(copied_single, "4000161111111111|12/28|123", "Individual card Copy button must copy the complete displayed pipe_format value")
+
+            # 3. Test Copy All button
+            copy_all_btn = page.locator("#btn-copy-gen")
+            copy_all_btn.click()
+            page.wait_for_timeout(200)
+
+            copied_all = page.evaluate("navigator.clipboard.readText()")
+            expected_all = "4000161111111111|12/28|123\n4000162222222222|12/28|123"
+            self.assertEqual(copied_all, expected_all, "Copy All action must copy all complete generated test values")
+
+            browser.close()
+
     def test_masked_pan_rendering_no_full_pan_leak(self):
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)

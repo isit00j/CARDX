@@ -118,12 +118,34 @@ function initGenerator() {
   if (btnCopy) {
     btnCopy.addEventListener('click', () => {
       if (currentGenerated.length === 0) return;
-      const text = currentGenerated.map(c => c.pipe_format).join('\n');
+      const text = currentGenerated.map(c => getUnmaskedPipe(c)).join('\n');
       navigator.clipboard.writeText(text);
       btnCopy.innerText = '✅ Copied!';
       setTimeout(() => { btnCopy.innerText = '📋 Copy All'; }, 2000);
     });
   }
+}
+
+function getUnmaskedPipe(c) {
+  if (c.pan) {
+    const expiry = c.expiry || (c.pipe_format ? c.pipe_format.split('|')[1] : '');
+    const cvv = c.cvv || (c.pipe_format ? c.pipe_format.split('|')[2] : '');
+    let result = c.pan;
+    if (expiry) result += `|${expiry}`;
+    if (cvv) result += `|${cvv}`;
+    return result;
+  }
+  return c.pipe_format || '';
+}
+
+function getUnmaskedFormatted(c) {
+  if (c.formatted && !c.formatted.includes('x') && !c.formatted.includes('X')) {
+    return c.formatted;
+  }
+  if (c.pan) {
+    return c.pan.replace(/(.{4})/g, '$1 ').trim();
+  }
+  return '';
 }
 
 function renderGeneratedCards(cards, container) {
@@ -144,13 +166,16 @@ function renderGeneratedCards(cards, container) {
     const main = document.createElement('div');
     main.className = 'card-main';
 
+    const fullPipe = getUnmaskedPipe(c);
+    const formattedPan = getUnmaskedFormatted(c);
+
     const pipe = document.createElement('span');
     pipe.className = 'card-pipe';
-    pipe.textContent = c.pipe_format || '';
+    pipe.textContent = fullPipe;
 
     const meta = document.createElement('span');
     meta.className = 'card-meta';
-    meta.textContent = `${c.brand || 'Unknown'} • ${c.formatted || ''}`;
+    meta.textContent = `${c.brand || 'Unknown'} • ${formattedPan}`;
 
     main.appendChild(pipe);
     main.appendChild(meta);
@@ -159,7 +184,7 @@ function renderGeneratedCards(cards, container) {
     btnCopy.className = 'btn btn-sm btn-secondary';
     btnCopy.textContent = '📋 Copy';
     btnCopy.addEventListener('click', () => {
-      navigator.clipboard.writeText(c.pipe_format || '');
+      navigator.clipboard.writeText(fullPipe);
       btnCopy.textContent = '✅ Copied!';
       setTimeout(() => { btnCopy.textContent = '📋 Copy'; }, 2000);
     });
