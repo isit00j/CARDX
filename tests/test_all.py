@@ -187,16 +187,53 @@ class TestAPIHandlers(unittest.TestCase):
         self.assertIn("4000161234567890|12/28|123", body_txt["content"])
 
     def test_csv_export_escaping_and_formula_neutralization(self):
+        import csv
+        from io import StringIO
+
         records = [
-            {"pan": "=1+1", "brand": 'Visa "Classic"', "expiry": "12/28\nLine2", "cvv": "123", "status": "PASS", "masked": "400016xxxxxx9010"}
+            {
+                "pan": "=SUM(1,2)",
+                "brand": 'Visa "Classic", Gold',
+                "expiry": "12/28\nNote",
+                "cvv": "123",
+                "status": "PASS",
+                "masked": "400016xxxxxx9010"
+            },
+            {
+                "pan": "+123456789",
+                "brand": "-Mastercard-",
+                "expiry": "@12/29",
+                "cvv": "\t456",
+                "status": "APPROVED / PASS",
+                "masked": "515676xxxxxx7890"
+            }
         ]
-        code, body = call_api_handler(export_handler, {"records": records, "format": "csv"})
-        self.assertEqual(code, 200)
-        content = body["content"]
-        # Formula '=' neutralized with "'"
-        self.assertIn('"' + "'=1+1" + '"', content)
-        # Quotes escaped as '""'
-        self.assertIn('"Visa ""Classic"""', content)
+
+        # Call cardx_core.export_records directly
+        csv_str, mime_type, filename = cardx_core.export_records(records, export_format="csv")
+        self.assertEqual(mime_type, "text/csv")
+        self.assertEqual(filename, "cardx_export.csv")
+
+        # Parse generated CSV using Python's standard csv.reader module
+        reader = list(csv.reader(StringIO(csv_str)))
+        self.assertEqual(len(reader), 3, "Header + 2 rows expected")
+
+        # Header check
+        self.assertEqual(reader[0], ["PAN", "Brand", "Expiry", "CVV", "Status", "Masked"])
+
+        # Row 1 check
+        self.assertEqual(reader[1][0], "'=SUM(1,2)", "Formula '=' prefixed with single quote")
+        self.assertEqual(reader[1][1], 'Visa "Classic", Gold', "Commas and embedded quotes parsed cleanly")
+        self.assertEqual(reader[1][2], "12/28\nNote", "Multiline newlines preserved cleanly")
+        self.assertEqual(reader[1][3], "123")
+        self.assertEqual(reader[1][4], "PASS")
+        self.assertEqual(reader[1][5], "400016xxxxxx9010")
+
+        # Row 2 check
+        self.assertEqual(reader[2][0], "'+123456789", "Formula '+' prefixed with single quote")
+        self.assertEqual(reader[2][1], "'-Mastercard-", "Formula '-' prefixed with single quote")
+        self.assertEqual(reader[2][2], "'@12/29", "Formula '@' prefixed with single quote")
+        self.assertEqual(reader[2][3], "'\t456", "Tab character prefixed with single quote")
 
     def test_extrapolated_records_csv_export_status(self):
         # Generate extrapolated records
